@@ -303,6 +303,8 @@ tbody tr:last-child td { border-bottom: 0; }
 .directory-card { padding-bottom: 16px; }
 .directory-form { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; align-items: end; gap: 10px; margin-top: 16px; }
 .directory-form .primary-button { min-height: 37px; white-space: nowrap; }
+.team-invite-form { grid-template-columns: minmax(0, 380px) auto; }
+.team-email-label { width: 100%; }
 .directory-demo-note { margin: 14px 0 0; color: var(--gray-text); font-size: 9px; line-height: 1.5; }
 .directory-error { margin-top: 11px; }
 .directory-empty { margin: 15px 0 0; color: var(--muted); font-size: 9px; }
@@ -362,7 +364,7 @@ tbody tr:last-child td { border-bottom: 0; }
   .reception-cta { align-self: flex-start; gap: 3px; padding: 6px; font-size: 0; }
   .reception-cta svg { width: 15px; height: 15px; }
   .stats-grid { gap: 8px; }
-  .directory-form { grid-template-columns: 1fr; }
+  .directory-form, .team-invite-form { grid-template-columns: 1fr; }
   .stat-card { min-height: 112px; padding: 11px 9px; }
   .stat-icon { width: 25px; height: 25px; margin-bottom: 6px; }
   .stat-icon svg { width: 16px; height: 16px; }

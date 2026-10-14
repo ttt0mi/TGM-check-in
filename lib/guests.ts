@@ -19,7 +19,8 @@ export type Guest = {
 
 export type NewGuest = Pick<Guest, "name" | "email" | "company" | "host_name" | "purpose">;
 export type EmployeeHost = { id: string; name: string; email: string; created_at: string };
-export type ReceptionWorkspace = { company_name: string; reception_token: string };
+export type ReceptionWorkspace = { company_name: string; reception_token: string; owner_id: string; role: "admin" | "reception" };
+export type ReceptionMember = { user_id: string; email: string; created_at: string };
 
 const STORAGE_KEY = "tgm-check-in-visits";
 const WORKSPACE_KEY = "tgm-check-in-workspace";
@@ -166,42 +167,9 @@ export async function listGuests(): Promise<Guest[]> {
   return data as Guest[];
 }
 
-export async function addGuest(input: NewGuest): Promise<Guest> {
-  const client = getSupabase();
-  if (client) {
-    const { data: host, error: hostError } = await client
-      .from("employee_hosts")
-      .select("id, name")
-      .eq("name", input.host_name)
-      .eq("active", true)
-      .single();
-    if (hostError) throw new Error("Choose a host from the employee directory before adding this visitor.");
-    const { data, error } = await client
-      .from("guests")
-      .insert({ ...input, host_id: host.id, host_name: host.name, status: "pending_approval" })
-      .select("id, name, email, company, host_name, host_id, purpose, status, checked_in_at, checked_out_at, host_notified_at, created_at")
-      .single();
-    if (error) throw error;
-    return data as Guest;
-  }
-
-  const guests = loadLocalGuests();
-  const host = loadLocalHosts().find((item) => item.name.toLowerCase() === input.host_name.toLowerCase());
-  if (!host) throw new Error("Choose a host from the employee directory before adding this visitor.");
-  const created_at = new Date().toISOString();
-  const guest: Guest = {
-    ...input,
-    host_name: host.name,
-    host_id: host.id,
-    id: crypto.randomUUID(),
-    status: "pending_approval",
-    checked_in_at: null,
-    checked_out_at: null,
-    host_notified_at: null,
-    created_at,
-  };
-  saveLocalGuests([guest, ...guests]);
-  return guest;
+export async function addGuest(input: NewGuest, receptionToken: string): Promise<void> {
+  const registered = await registerVisitor(receptionToken, input);
+  if (!registered) throw new Error("Unable to add visitor: the reception QR code is invalid.");
 }
 
 export async function setGuestStatus(id: string, status: GuestStatus): Promise<void> {
@@ -228,10 +196,10 @@ export async function setGuestStatus(id: string, status: GuestStatus): Promise<v
 export async function getReceptionWorkspace(): Promise<ReceptionWorkspace> {
   const client = getSupabase();
   if (client) {
-    const { data, error } = await client.rpc("get_or_create_reception_workspace");
+    const { data, error } = await client.rpc("get_my_reception_access");
     if (error) throw error;
     const workspace = data?.[0] as ReceptionWorkspace | undefined;
-    if (!workspace) throw new Error("Unable to load the reception QR code.");
+    if (!workspace) throw new Error("This account does not have access to a reception workspace.");
     return workspace;
   }
 
@@ -248,12 +216,12 @@ export async function getReceptionWorkspace(): Promise<ReceptionWorkspace> {
     ) {
       throw new Error("Saved company workspace has an invalid format.");
     }
-    return { company_name: workspace.company_name, reception_token: workspace.reception_token };
+    return { company_name: workspace.company_name, reception_token: workspace.reception_token, owner_id: "demo-owner", role: "admin" };
   }
 
   const workspace = { company_name: "Tomorrow Studio", reception_token: crypto.randomUUID() };
   window.localStorage.setItem(WORKSPACE_KEY, JSON.stringify(workspace));
-  return workspace;
+  return { ...workspace, owner_id: "demo-owner", role: "admin" };
 }
 
 export async function updateCompanyName(name: string): Promise<void> {
@@ -384,6 +352,50 @@ export async function removeEmployeeHost(id: string): Promise<void> {
     return;
   }
   window.localStorage.setItem(HOSTS_KEY, JSON.stringify(loadLocalHosts().filter((host) => host.id !== id)));
+}
+
+export async function inviteReceptionMember(email: string): Promise<void> {
+  const client = getSupabase();
+  if (!client) throw new Error("Reception team invitations require a connected Supabase workspace.");
+  const { data, error } = await client.auth.getSession();
+  if (error) throw error;
+  if (!data.session) throw new Error("Sign in as a company administrator to invite reception staff.");
+  const response = await fetch("/api/reception-team", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${data.session.access_token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ email }),
+  });
+  const result = await response.json() as { error?: string };
+  if (!response.ok) throw new Error(result.error || "Unable to invite reception team member.");
+}
+
+export async function listReceptionMembers(): Promise<ReceptionMember[]> {
+  const client = getSupabase();
+  if (!client) return [];
+  const { data, error } = await client.rpc("list_reception_team");
+  if (error) throw error;
+  return (data ?? []) as ReceptionMember[];
+}
+
+export async function removeReceptionMember(userId: string): Promise<void> {
+  const client = getSupabase();
+  if (!client) throw new Error("Reception team management requires a connected Supabase workspace.");
+  const { data, error: sessionError } = await client.auth.getSession();
+  if (sessionError) throw sessionError;
+  if (!data.session) throw new Error("Sign in as a company administrator to manage reception staff.");
+  const response = await fetch("/api/reception-team", {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${data.session.access_token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ user_id: userId }),
+  });
+  const result = await response.json() as { error?: string };
+  if (!response.ok) throw new Error(result.error || "Unable to remove reception team member.");
 }
 
 export async function approveDemoGuest(id: string): Promise<void> {

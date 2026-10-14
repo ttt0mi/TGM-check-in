@@ -12,7 +12,11 @@ import {
   hasSupabaseConfig,
   listEmployeeHosts,
   listGuests,
+  listReceptionHosts,
+  listReceptionMembers,
   removeEmployeeHost,
+  removeReceptionMember,
+  inviteReceptionMember,
   setGuestStatus,
   updateCompanyName,
   type EmployeeHost,
@@ -77,6 +81,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<Session | null>(null);
   const [authReady, setAuthReady] = useState(!hasSupabaseConfig);
+  const [accessReady, setAccessReady] = useState(!hasSupabaseConfig);
   const [authMode, setAuthMode] = useState<"signin" | "signup">("signin");
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
@@ -86,6 +91,9 @@ export default function Home() {
   const [realtimeError, setRealtimeError] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [receptionToken, setReceptionToken] = useState("");
+  const [workspaceOwnerId, setWorkspaceOwnerId] = useState("");
+  const [accessRole, setAccessRole] = useState<"admin" | "reception">("admin");
+  const [accessError, setAccessError] = useState("");
   const [hostNames, setHostNames] = useState<string[]>([]);
   const [page, setPage] = useState("Overview");
   const [query, setQuery] = useState("");
@@ -107,10 +115,15 @@ export default function Home() {
       setSession(data.session);
       setAuthReady(true);
     });
-    const { data: { subscription } } = client.auth.onAuthStateChange((_event, nextSession) => {
+    const { data: { subscription } } = client.auth.onAuthStateChange((event, nextSession) => {
       setSession(nextSession);
       setAuthError("");
       setAuthNotice("");
+      if (event === "SIGNED_IN") {
+        setAccessReady(false);
+        setAccessError("");
+        setWorkspaceOwnerId("");
+      }
     });
     return () => subscription.unsubscribe();
   }, []);
@@ -121,7 +134,8 @@ export default function Home() {
       setGuests(await listGuests());
       setError("");
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Unable to load today's visitors.");
+      const message = cause instanceof Error ? cause.message : "Unable to load today's visitors.";
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -130,12 +144,20 @@ export default function Home() {
   useEffect(() => {
     if (!authReady || (hasSupabaseConfig && !session)) return;
     void refreshGuests();
-    Promise.all([getReceptionWorkspace(), listEmployeeHosts()]).then(([workspace, hosts]) => {
+    getReceptionWorkspace().then(async (workspace) => {
+      const hosts = workspace.role === "admin"
+        ? (await listEmployeeHosts()).map((host) => host.name)
+        : await listReceptionHosts(workspace.reception_token);
       setCompanyName(workspace.company_name);
       setReceptionToken(workspace.reception_token);
-      setHostNames(hosts.map((host) => host.name));
+      setWorkspaceOwnerId(workspace.owner_id);
+      setAccessRole(workspace.role);
+      setAccessError("");
+      setHostNames(hosts);
+      setAccessReady(true);
     }).catch((cause: unknown) => {
-      setError(cause instanceof Error ? cause.message : "Unable to set up the reception QR code.");
+      setAccessError(cause instanceof Error ? cause.message : "Unable to load your reception workspace.");
+      setAccessReady(true);
     });
   }, [authReady, refreshGuests, session]);
 
@@ -149,7 +171,7 @@ export default function Home() {
         event: "*",
         schema: "public",
         table: "guests",
-        filter: `owner_id=eq.${session.user.id}`,
+        filter: `owner_id=eq.${workspaceOwnerId}`,
       }, () => { void refreshGuests(); })
       .subscribe((status, subscriptionError) => {
         if (status === "SUBSCRIBED") {
@@ -166,10 +188,10 @@ export default function Home() {
       setRealtimeConnected(false);
       void client.removeChannel(channel);
     };
-  }, [refreshGuests, session]);
+  }, [refreshGuests, session, workspaceOwnerId]);
 
   const stats = useMemo(() => ({
-    total: guests.length,
+    total: guests.filter((guest) => guest.status === "checked_in" || guest.status === "checked_out").length,
     onSite: guests.filter((guest) => guest.status === "checked_in").length,
     checkedOut: guests.filter((guest) => guest.status === "checked_out").length,
     pending: guests.filter((guest) => guest.status === "pending_approval").length,
@@ -246,7 +268,7 @@ export default function Home() {
         company: String(form.get("company") ?? "").trim(),
         host_name,
         purpose,
-      });
+      }, receptionToken);
       setShowAdd(false);
       setNotice("Visitor request added. It is pending approval and the host will be notified after approval.");
       await refreshGuests();
@@ -329,7 +351,7 @@ export default function Home() {
           <div className="brand-mark">t<span>.</span></div>
           <p className="eyebrow">TGM CHECK-IN</p>
           <h1>{authMode === "signin" ? "Welcome back" : "Set up your company"}</h1>
-          <p className="auth-copy">Sign in to manage your office visitor check-ins.</p>
+          <p className="auth-copy">{authMode === "signin" ? "Sign in with your company admin or invited reception team account." : "Create a company administrator account. Reception staff should use their email invitation to set a password."}</p>
           <form className="guest-form" onSubmit={handleAuth}>
             <label>Email address<input type="email" value={authEmail} onChange={(event) => setAuthEmail(event.target.value)} placeholder="you@company.com" autoComplete="email" required /></label>
             <label>Password<input type="password" value={authPassword} onChange={(event) => setAuthPassword(event.target.value)} placeholder="At least 6 characters" autoComplete={authMode === "signin" ? "current-password" : "new-password"} minLength={6} required /></label>
@@ -345,6 +367,14 @@ export default function Home() {
     );
   }
 
+  if (hasSupabaseConfig && session && !accessReady) {
+    return <main className="loading-screen"><span className="spinner" />Loading your reception access…</main>;
+  }
+
+  if (hasSupabaseConfig && session && accessError) {
+    return <main className="auth-screen"><section className="auth-card"><div className="brand-mark">t<span>.</span></div><p className="eyebrow">RECEPTION ACCESS</p><h1>Workspace unavailable</h1><p className="auth-copy">{accessError}</p><button className="primary-button full-button" onClick={handleSignOut}>Sign out</button></section></main>;
+  }
+
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -355,11 +385,11 @@ export default function Home() {
           <button className={`nav-item ${page === "Overview" ? "active" : ""}`} onClick={() => setPage("Overview")}><Icon name="grid" />Overview</button>
           <button className={`nav-item ${page === "Visitors" ? "active" : ""}`} onClick={() => setPage("Visitors")}><Icon name="users" />Visitors<span className="nav-count">{stats.total}</span></button>
           <button className={`nav-item ${page === "Analytics" ? "active" : ""}`} onClick={() => setPage("Analytics")}><Icon name="chart" />Visitor report</button>
-          <button className={`nav-item ${page === "Settings" ? "active" : ""}`} onClick={() => setPage("Settings")}><Icon name="settings" />Settings</button>
+          {accessRole === "admin" && <button className={`nav-item ${page === "Settings" ? "active" : ""}`} onClick={() => setPage("Settings")}><Icon name="settings" />Settings</button>}
         </nav>
         <div className="sidebar-bottom">
           <div className="help-card"><div className="help-spark">✳</div><strong>Need a hand?</strong><p>We&apos;re here to make welcoming visitors a breeze.</p><a href="mailto:hello@tgmcheckin.com">Get in touch <Icon name="arrow" size={14} /></a></div>
-          <div className="profile"><div className="profile-avatar">{initials(session?.user.email?.split("@")[0] || "Office admin")}</div><span><strong>{session?.user.email ?? "Office admin"}</strong><small>{hasSupabaseConfig ? "Workspace admin" : "Reception team"}</small></span>{session && <button className="icon-button profile-logout" aria-label="Sign out" onClick={handleSignOut}><Icon name="logout" /></button>}</div>
+          <div className="profile"><div className="profile-avatar">{initials(session?.user.email?.split("@")[0] || "Office admin")}</div><span><strong>{session?.user.email ?? "Office admin"}</strong><small>{hasSupabaseConfig ? accessRole === "admin" ? "Workspace admin" : "Reception team" : "Reception team"}</small></span>{session && <button className="icon-button profile-logout" aria-label="Sign out" onClick={handleSignOut}><Icon name="logout" /></button>}</div>
         </div>
       </aside>
 
@@ -375,7 +405,7 @@ export default function Home() {
             {stats.pending > 0 && <button className="pending-banner" onClick={() => { setPage("Visitors"); setFilter("pending_approval"); }}><span>{stats.pending} visitor{stats.pending === 1 ? "" : "s"} waiting for approval</span><span>Review arrivals <Icon name="arrow" size={14} /></span></button>}
             <section className="reception-banner"><div className="reception-icon"><Icon name="qr" size={22} /></div><div className="reception-info"><span className="event-kicker">YOUR FRONT DESK CHECK-IN</span><h2>One QR for every visitor</h2><p>Display this code at reception. Visitors submit their details for admin approval.</p></div><button className="reception-cta" onClick={() => setShowQr(true)}>Show QR code <Icon name="arrow" size={14} /></button><div className="banner-decoration banner-decoration-one" /><div className="banner-decoration banner-decoration-two" /></section>
             <section className="stats-grid" aria-label="Today's visitor statistics">
-              <StatCard label="Visitors today" value={stats.total} caption="Total check-ins today" icon="users" color="lavender" trend="Today" />
+              <StatCard label="Visitors today" value={stats.total} caption="Approved visits today" icon="users" color="lavender" trend="Today" />
               <StatCard label="Currently on site" value={stats.onSite} caption="Visitors still in the office" icon="check" color="mint" trend="On site" />
               <StatCard label="Checked out" value={stats.checkedOut} caption="Visits completed today" icon="clock" color="peach" trend="Departed" />
             </section>
@@ -394,7 +424,7 @@ export default function Home() {
 
           {page === "Analytics" && <><section className="page-heading"><div><p className="eyebrow">DAILY VISITOR REPORT</p><h1>Visitor report</h1><p className="heading-subtitle">Office visitor activity for {formatToday()}.</p></div></section><section className="stats-grid"><StatCard label="Total visits" value={stats.total} caption="Recorded today" icon="users" color="lavender" trend="Today" /><StatCard label="Currently on site" value={stats.onSite} caption="Visitors in the office" icon="check" color="mint" trend="On site" /><StatCard label="Visits completed" value={stats.checkedOut} caption="Checked out today" icon="clock" color="peach" trend="Completed" /></section><section className="panel analytics-table"><div className="panel-heading"><div><h2>Visits by host</h2><p>Employees welcoming visitors today</p></div></div><div className="analytics-bars">{hostCounts.length ? hostCounts.map(([host, count]) => <div className="analytics-row" key={host}><span>{host}</span><div className="analytics-track"><i style={{ width: `${stats.total ? count / stats.total * 100 : 0}%`, background: "#5968de" }} /></div><strong>{count}</strong></div>) : <p className="settings-heading">No visitor activity recorded today.</p>}</div></section></>}
 
-          {page === "Settings" && <SettingsPanel configured={hasSupabaseConfig} companyName={companyName} onShowQr={() => setShowQr(true)} onSaveCompanyName={saveCompanyName} onHostsChanged={async () => { const hosts = await listEmployeeHosts(); setHostNames(hosts.map((host) => host.name)); }} />}
+          {page === "Settings" && accessRole === "admin" && <SettingsPanel configured={hasSupabaseConfig} companyName={companyName} onShowQr={() => setShowQr(true)} onSaveCompanyName={saveCompanyName} onHostsChanged={async () => { const hosts = await listEmployeeHosts(); setHostNames(hosts.map((host) => host.name)); }} />}
         </div>
       </main>
 
@@ -502,9 +532,73 @@ function SettingsPanel({ configured, companyName, onShowQr, onSaveCompanyName, o
       <div className="settings-divider" />
       <div className="connection-instructions"><h3>Reception QR code</h3><p>Visitors submit their details and select a host. They remain pending until an administrator approves them; approval checks them in and sends an email to the host.</p><button className="primary-button settings-qr-button" onClick={onShowQr}><Icon name="qr" size={16} /> Show reception QR code</button></div>
     </section>
+    <ReceptionTeam configured={configured} />
     <EmployeeDirectory configured={configured} onHostsChanged={onHostsChanged} />
     <section className="panel settings-card local-data-card"><div className="settings-heading"><span className="settings-status-icon local"><Icon name="users" size={20} /></span><div><h2>Daily visitor history</h2><p>Visitor log entries keep each office visit separate, including repeat visitors. The overview displays check-ins for today.</p></div></div></section>
   </>;
+}
+
+function ReceptionTeam({ configured }: { configured: boolean }) {
+  const [members, setMembers] = useState<Awaited<ReturnType<typeof listReceptionMembers>>>([]);
+  const [email, setEmail] = useState("");
+  const [loading, setLoading] = useState(configured);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+
+  const refresh = useCallback(async () => {
+    if (!configured) return;
+    setLoading(true);
+    try {
+      setMembers(await listReceptionMembers());
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Unable to load reception team.");
+    } finally {
+      setLoading(false);
+    }
+  }, [configured]);
+
+  useEffect(() => { void refresh(); }, [refresh]);
+
+  async function invite(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSaving(true);
+    setError("");
+    setNotice("");
+    try {
+      await inviteReceptionMember(email.trim());
+      setEmail("");
+      setNotice("Invitation sent. The team member can set their password from the email, then sign in here.");
+      await refresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Unable to invite reception team member.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function remove(userId: string) {
+    setError("");
+    try {
+      await removeReceptionMember(userId);
+      await refresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Unable to remove reception access.");
+    }
+  }
+
+  return <section className="panel settings-card directory-card">
+    <div className="settings-heading"><span className="settings-status-icon"><Icon name="users" size={20} /></span><div><h2>Reception team access</h2><p>Invite staff to verify arrivals, approve check-ins, and check visitors out. They cannot change company or employee settings.</p></div></div>
+    {!configured
+      ? <p className="directory-demo-note">Connect Supabase to invite reception staff. Each team member signs in with their own account.</p>
+      : <form className="directory-form team-invite-form guest-form" onSubmit={invite}>
+        <label className="team-email-label">Team member email<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="reception@company.com" maxLength={254} required /></label>
+        <button className="primary-button" type="submit" disabled={saving}>{saving ? "Sending invite…" : "Invite reception staff"}</button>
+      </form>}
+    {error && <p className="form-error directory-error" role="alert">{error}</p>}
+    {notice && <p className="form-success directory-error" role="status">{notice}</p>}
+    {configured && (loading ? <p className="directory-empty">Loading reception team…</p> : members.length === 0 ? <p className="directory-empty">No reception team members invited yet.</p> : <ul className="host-list">{members.map((member) => <li key={member.user_id}><span><strong>{member.email}</strong><small>Reception staff</small></span><button className="text-button" type="button" onClick={() => void remove(member.user_id)}>Remove access</button></li>)}</ul>)}
+  </section>;
 }
 
 function EmployeeDirectory({ configured, onHostsChanged }: { configured: boolean; onHostsChanged: () => Promise<void> }) {

@@ -17,14 +17,17 @@ Open [http://localhost:3000](http://localhost:3000). Without Supabase credential
 
 1. Create a Supabase project and copy `.env.example` to `.env.local`.
 2. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` to your project URL and publishable anon key.
-3. Apply both migrations in `supabase/migrations/` using the Supabase SQL editor or your migration workflow, in filename order.
+3. Apply every migration in `supabase/migrations/` using the Supabase SQL editor or your migration workflow, in filename order.
 4. Enable email/password authentication in Supabase Auth. Company administrators create an account or sign in from the portal.
-5. Create a Resend account, verify a sender domain/address, and set `RESEND_API_KEY` and `RESEND_FROM_EMAIL` in the server environment. Do not prefix these values with `NEXT_PUBLIC_`.
-6. Restart the development server after changing environment variables.
+5. Set `SUPABASE_SERVICE_ROLE_KEY` in the server environment for reception invitations and private host-email lookup. This secret must never use the `NEXT_PUBLIC_` prefix or be exposed to the browser.
+6. Create a Resend account, verify a sender domain/address, and set `RESEND_API_KEY` and `RESEND_FROM_EMAIL` in the server environment. Do not prefix these values with `NEXT_PUBLIC_`.
+7. Restart the development server after changing environment variables.
 
 Visitor records are protected by row-level security and belong to the company administrator. A company-specific reception QR token routes visitors to a public check-in form. Narrow `SECURITY DEFINER` functions validate that QR token and record the visit without exposing private visitor records. Keep the anon key public and never put a Supabase service-role key in a browser environment variable.
 
 Add employee names and work email addresses under **Settings → Employee host directory**. The public QR form exposes employee names only, never their email addresses. An administrator approves arrivals from the visitor log; the server-side approval endpoint then emails the selected employee through Resend. If email delivery fails after approval, the administrator can retry it from the visitor row. Demo mode supports the approval flow locally but never sends real email.
+
+Company administrators can invite reception staff under **Settings → Reception team access**. Invited staff receive a Supabase Auth email to set up their password and sign in with their own account. They can view the visitor log, approve arrivals, and check visitors out; only the workspace owner can change company settings, employee hosts, or team access. Supabase row-level security enforces these workspace and role boundaries.
 
 ## Features
 
