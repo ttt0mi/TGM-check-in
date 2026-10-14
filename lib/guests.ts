@@ -1,6 +1,6 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-export type GuestStatus = "checked_in" | "checked_out";
+export type GuestStatus = "pending_approval" | "checked_in" | "checked_out";
 
 export type Guest = {
   id: string;
@@ -8,18 +8,22 @@ export type Guest = {
   email: string;
   company: string;
   host_name: string;
+  host_id: string | null;
   purpose: string;
   status: GuestStatus;
-  checked_in_at: string;
+  checked_in_at: string | null;
   checked_out_at: string | null;
+  host_notified_at: string | null;
   created_at: string;
 };
 
 export type NewGuest = Pick<Guest, "name" | "email" | "company" | "host_name" | "purpose">;
+export type EmployeeHost = { id: string; name: string; email: string; created_at: string };
 export type ReceptionWorkspace = { company_name: string; reception_token: string };
 
 const STORAGE_KEY = "tgm-check-in-visits";
 const WORKSPACE_KEY = "tgm-check-in-workspace";
+const HOSTS_KEY = "tgm-check-in-hosts";
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -46,10 +50,12 @@ const demoGuests: Guest[] = [
     email: "olivia@untitledui.com",
     company: "Untitled UI",
     host_name: "Alex Smith",
+    host_id: "demo-host-alex",
     purpose: "Project meeting",
     status: "checked_in",
     checked_in_at: minutesAgo(52),
     checked_out_at: null,
+    host_notified_at: null,
     created_at: minutesAgo(52),
   },
   {
@@ -58,10 +64,12 @@ const demoGuests: Guest[] = [
     email: "phoenix@acme.com",
     company: "Acme Inc.",
     host_name: "Jordan Lee",
+    host_id: "demo-host-jordan",
     purpose: "Interview",
     status: "checked_in",
     checked_in_at: minutesAgo(39),
     checked_out_at: null,
+    host_notified_at: null,
     created_at: minutesAgo(39),
   },
   {
@@ -70,10 +78,12 @@ const demoGuests: Guest[] = [
     email: "lana@circooles.com",
     company: "Circooles",
     host_name: "Alex Smith",
+    host_id: "demo-host-alex",
     purpose: "Client meeting",
     status: "checked_in",
     checked_in_at: minutesAgo(23),
     checked_out_at: null,
+    host_notified_at: null,
     created_at: minutesAgo(23),
   },
   {
@@ -82,10 +92,12 @@ const demoGuests: Guest[] = [
     email: "demi@layers.com",
     company: "Layers",
     host_name: "Sam Rivera",
+    host_id: "demo-host-sam",
     purpose: "Delivery",
     status: "checked_out",
     checked_in_at: minutesAgo(46),
     checked_out_at: minutesAgo(35),
+    host_notified_at: null,
     created_at: minutesAgo(46),
   },
   {
@@ -94,12 +106,21 @@ const demoGuests: Guest[] = [
     email: "candice@catalog.com",
     company: "Catalog",
     host_name: "Morgan Chen",
+    host_id: "demo-host-morgan",
     purpose: "Vendor meeting",
     status: "checked_out",
     checked_in_at: minutesAgo(34),
     checked_out_at: minutesAgo(21),
+    host_notified_at: null,
     created_at: minutesAgo(34),
   },
+];
+
+const demoHosts: EmployeeHost[] = [
+  { id: "demo-host-alex", name: "Alex Smith", email: "alex@example.invalid", created_at: minutesAgo(500) },
+  { id: "demo-host-jordan", name: "Jordan Lee", email: "jordan@example.invalid", created_at: minutesAgo(500) },
+  { id: "demo-host-sam", name: "Sam Rivera", email: "sam@example.invalid", created_at: minutesAgo(500) },
+  { id: "demo-host-morgan", name: "Morgan Chen", email: "morgan@example.invalid", created_at: minutesAgo(500) },
 ];
 
 function getTodayRange() {
@@ -136,7 +157,7 @@ export async function listGuests(): Promise<Guest[]> {
 
   const { data, error } = await client
     .from("guests")
-    .select("id, name, email, company, host_name, purpose, status, checked_in_at, checked_out_at, created_at")
+    .select("id, name, email, company, host_name, host_id, purpose, status, checked_in_at, checked_out_at, host_notified_at, created_at")
     .gte("created_at", start)
     .lt("created_at", end)
     .order("created_at", { ascending: false });
@@ -148,24 +169,36 @@ export async function listGuests(): Promise<Guest[]> {
 export async function addGuest(input: NewGuest): Promise<Guest> {
   const client = getSupabase();
   if (client) {
+    const { data: host, error: hostError } = await client
+      .from("employee_hosts")
+      .select("id, name")
+      .eq("name", input.host_name)
+      .eq("active", true)
+      .single();
+    if (hostError) throw new Error("Choose a host from the employee directory before adding this visitor.");
     const { data, error } = await client
       .from("guests")
-      .insert(input)
-      .select("id, name, email, company, host_name, purpose, status, checked_in_at, checked_out_at, created_at")
+      .insert({ ...input, host_id: host.id, host_name: host.name, status: "pending_approval" })
+      .select("id, name, email, company, host_name, host_id, purpose, status, checked_in_at, checked_out_at, host_notified_at, created_at")
       .single();
     if (error) throw error;
     return data as Guest;
   }
 
   const guests = loadLocalGuests();
-  const checked_in_at = new Date().toISOString();
+  const host = loadLocalHosts().find((item) => item.name.toLowerCase() === input.host_name.toLowerCase());
+  if (!host) throw new Error("Choose a host from the employee directory before adding this visitor.");
+  const created_at = new Date().toISOString();
   const guest: Guest = {
     ...input,
+    host_name: host.name,
+    host_id: host.id,
     id: crypto.randomUUID(),
-    status: "checked_in",
-    checked_in_at,
+    status: "pending_approval",
+    checked_in_at: null,
     checked_out_at: null,
-    created_at: checked_in_at,
+    host_notified_at: null,
+    created_at,
   };
   saveLocalGuests([guest, ...guests]);
   return guest;
@@ -261,15 +294,20 @@ export async function registerVisitor(
 
   const workspace = await getReceptionWorkspace();
   if (workspace.reception_token !== receptionToken) return null;
-  const checked_in_at = new Date().toISOString();
+  const host = loadLocalHosts().find((item) => item.name.toLowerCase() === input.host_name.toLowerCase());
+  if (!host) throw new Error("That employee is no longer in the host directory. Please select another host.");
+  const created_at = new Date().toISOString();
   const guests = loadLocalGuests();
   const guest: Guest = {
     ...input,
+    host_name: host.name,
+    host_id: host.id,
     id: crypto.randomUUID(),
-    status: "checked_in",
-    checked_in_at,
+    status: "pending_approval",
+    checked_in_at: null,
     checked_out_at: null,
-    created_at: checked_in_at,
+    host_notified_at: null,
+    created_at,
   };
   saveLocalGuests([guest, ...guests]);
   return {
@@ -279,6 +317,83 @@ export async function registerVisitor(
     status: guest.status,
     checked_in_at: guest.checked_in_at,
   };
+}
+
+function loadLocalHosts(): EmployeeHost[] {
+  const stored = window.localStorage.getItem(HOSTS_KEY);
+  if (!stored) {
+    window.localStorage.setItem(HOSTS_KEY, JSON.stringify(demoHosts));
+    return demoHosts;
+  }
+  const hosts: unknown = JSON.parse(stored);
+  if (!Array.isArray(hosts)) throw new Error("Saved employee directory has an invalid format.");
+  return hosts as EmployeeHost[];
+}
+
+export async function listEmployeeHosts(): Promise<EmployeeHost[]> {
+  const client = getSupabase();
+  if (!client) return loadLocalHosts();
+  const { data, error } = await client
+    .from("employee_hosts")
+    .select("id, name, email, created_at")
+    .eq("active", true)
+    .order("name");
+  if (error) throw error;
+  return data as EmployeeHost[];
+}
+
+export async function listReceptionHosts(receptionToken: string): Promise<string[]> {
+  const client = getSupabase();
+  if (client) {
+    const { data, error } = await client.rpc("get_reception_hosts_by_qr", {
+      reception_token: receptionToken,
+    });
+    if (error) throw error;
+    return (data ?? []).map((row: { host_name: string }) => row.host_name);
+  }
+  const workspace = await getReceptionWorkspace();
+  if (workspace.reception_token !== receptionToken) return [];
+  return loadLocalHosts().map((host) => host.name);
+}
+
+export async function addEmployeeHost(name: string, email: string): Promise<EmployeeHost> {
+  const client = getSupabase();
+  if (client) {
+    const { data, error } = await client
+      .from("employee_hosts")
+      .insert({ name, email })
+      .select("id, name, email, created_at")
+      .single();
+    if (error) throw error;
+    return data as EmployeeHost;
+  }
+  const hosts = loadLocalHosts();
+  if (hosts.some((host) => host.name.toLowerCase() === name.toLowerCase())) {
+    throw new Error("An employee with this name is already in the directory.");
+  }
+  const host = { id: crypto.randomUUID(), name, email, created_at: new Date().toISOString() };
+  window.localStorage.setItem(HOSTS_KEY, JSON.stringify([...hosts, host]));
+  return host;
+}
+
+export async function removeEmployeeHost(id: string): Promise<void> {
+  const client = getSupabase();
+  if (client) {
+    const { error } = await client.from("employee_hosts").update({ active: false }).eq("id", id);
+    if (error) throw error;
+    return;
+  }
+  window.localStorage.setItem(HOSTS_KEY, JSON.stringify(loadLocalHosts().filter((host) => host.id !== id)));
+}
+
+export async function approveDemoGuest(id: string): Promise<void> {
+  if (getSupabase()) throw new Error("Visitor approvals must use the authenticated approval endpoint.");
+  const guests = loadLocalGuests();
+  const guest = guests.find((item) => item.id === id);
+  if (!guest || guest.status !== "pending_approval") throw new Error("This visitor is no longer awaiting approval.");
+  saveLocalGuests(guests.map((item) => item.id === id
+    ? { ...item, status: "checked_in", checked_in_at: new Date().toISOString() }
+    : item));
 }
 
 export async function getReceptionCompanyName(receptionToken: string): Promise<string | null> {
