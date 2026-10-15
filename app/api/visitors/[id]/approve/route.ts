@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { Resend } from "resend";
 
 type VisitorDetails = {
   id: string;
@@ -97,32 +98,23 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     .single();
   if (companyResult.error) return jsonError(`Visitor approved, but the company name could not be loaded: ${companyResult.error.message}`, 500);
 
-  const emailResponse = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${resendApiKey}`,
-      "Content-Type": "application/json",
-      "Idempotency-Key": `tgm-visitor-host-notification-${id}`,
-    },
-    body: JSON.stringify({
-      from: resendFromEmail,
-      to: [host.email],
-      subject: `${visitor.name} has arrived at ${companyResult.data.company_name}`,
-      text: [
-        `Hello ${host.name},`,
-        "",
-        `${visitor.name} has been approved by reception and is checked in to visit you.`,
-        `Visitor email: ${visitor.email}`,
-        `Company: ${visitor.company || "Not provided"}`,
-        `Purpose: ${visitor.purpose}`,
-        `Arrival time: ${new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(new Date())}`,
-      ].join("\n"),
-    }),
-    cache: "no-store",
-  });
-  if (!emailResponse.ok) {
-    const responseText = await emailResponse.text();
-    return jsonError(`Visitor approved, but the host email could not be sent: ${responseText || emailResponse.statusText}`, 502);
+  const resend = new Resend(resendApiKey);
+  const { error: emailError } = await resend.emails.send({
+    from: resendFromEmail,
+    to: [host.email],
+    subject: `${visitor.name} has arrived at ${companyResult.data.company_name}`,
+    text: [
+      `Hello ${host.name},`,
+      "",
+      `${visitor.name} has been approved by reception and is checked in to visit you.`,
+      `Visitor email: ${visitor.email}`,
+      `Company: ${visitor.company || "Not provided"}`,
+      `Purpose: ${visitor.purpose}`,
+      `Arrival time: ${new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(new Date())}`,
+    ].join("\n"),
+  }, { idempotencyKey: `tgm-visitor-host-notification-${id}` });
+  if (emailError) {
+    return jsonError(`Visitor approved, but the host email could not be sent: ${emailError.message}`, 502);
   }
 
   const { error: notificationError } = await client
