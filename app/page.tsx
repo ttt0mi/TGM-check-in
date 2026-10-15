@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import Image from "next/image";
 import type { Session } from "@supabase/supabase-js";
 import { QRCodeSVG } from "qrcode.react";
 import {
@@ -348,7 +349,7 @@ export default function Home() {
     return (
       <main className="auth-screen">
         <div className="auth-card">
-          <div className="brand-mark">t<span>.</span></div>
+          <Image className="auth-logo" src="/tgm-logo.jpg" alt="TGM Marchnata" width={220} height={69} priority />
           <p className="eyebrow">TGM CHECK-IN</p>
           <h1>{authMode === "signin" ? "Welcome back" : "Set up your company"}</h1>
           <p className="auth-copy">{authMode === "signin" ? "Sign in with your company admin or invited reception team account." : "Create a company administrator account. Reception staff should use their email invitation to set a password."}</p>
@@ -372,13 +373,13 @@ export default function Home() {
   }
 
   if (hasSupabaseConfig && session && accessError) {
-    return <main className="auth-screen"><section className="auth-card"><div className="brand-mark">t<span>.</span></div><p className="eyebrow">RECEPTION ACCESS</p><h1>Workspace unavailable</h1><p className="auth-copy">{accessError}</p><button className="primary-button full-button" onClick={handleSignOut}>Sign out</button></section></main>;
+    return <main className="auth-screen"><section className="auth-card"><Image className="auth-logo" src="/tgm-logo.jpg" alt="TGM Marchnata" width={220} height={69} priority /><p className="eyebrow">RECEPTION ACCESS</p><h1>Workspace unavailable</h1><p className="auth-copy">{accessError}</p><button className="primary-button full-button" onClick={handleSignOut}>Sign out</button></section></main>;
   }
 
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <a href="#" className="brand"><span className="brand-mark">t<span>.</span></span><span className="brand-word">tgm<span>check-in</span></span></a>
+        <a href="#" className="brand" aria-label="TGM Check-in home"><Image className="brand-logo" src="/tgm-logo.jpg" alt="TGM Marchnata" width={190} height={60} priority /></a>
         <div className="workspace-select"><span className="workspace-icon">{(companyName || "C")[0].toUpperCase()}</span><span><strong>{companyName || "Your company"}</strong><small>Visitor workspace</small></span><span className="chevron">⌄</span></div>
         <p className="nav-label">WORKSPACE</p>
         <nav className="main-nav" aria-label="Main navigation">

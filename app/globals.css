@@ -32,6 +32,7 @@ a { color: inherit; text-decoration: none; }
 .app-shell { min-height: 100vh; }
 .sidebar { width: 250px; position: fixed; inset: 0 auto 0 0; z-index: 3; display: flex; flex-direction: column; padding: 27px 18px 15px; background: #fff; border-right: 1px solid var(--line); }
 .brand { display: flex; align-items: center; gap: 10px; padding: 0 8px 27px; }
+.brand-logo { display: block; width: 190px; height: auto; max-height: 60px; object-fit: contain; object-position: left center; }
 .brand-mark { display: grid; width: 35px; height: 35px; place-items: center; flex: 0 0 35px; border-radius: 11px; background: var(--navy); color: white; font-family: Manrope, sans-serif; font-size: 23px; font-weight: 800; letter-spacing: -2px; }
 .brand-mark span { color: #ee8b91; }
 .brand-word { font-family: Manrope, sans-serif; font-size: 15px; font-weight: 800; letter-spacing: -.55px; }
@@ -275,12 +276,14 @@ tbody tr:last-child td { border-bottom: 0; }
 .loading-screen { gap: 9px; color: #777985; font-size: 12px; }
 .auth-card { width: min(100% - 32px, 390px); padding: 31px; border: 1px solid #a80c0c; border-radius: 12px; background: #fff; box-shadow: 0 8px 32px #24273a0a; }
 .auth-card > .brand-mark { margin-bottom: 20px; }
+.auth-logo { display: block; width: min(100%, 220px); height: auto; margin-bottom: 20px; }
 .auth-card h1 { margin: 0; font-family: Manrope, sans-serif; font-size: 24px; letter-spacing: -.7px; }
 .auth-copy { margin: 7px 0 23px; color: #858791; font-size: 11px; }
 .auth-card .guest-form { gap: 13px; }
 .auth-card .full-button { margin-top: 3px; }
 .checkin-screen { position: relative; flex-direction: column; min-height: 100svh; padding: 76px 18px 55px; background: radial-gradient(ellipse at 50% 0%, #e9edf2 0%, #f6f7f9 54%); }
-.checkin-top-brand { position: absolute; top: 27px; display: flex; align-items: center; gap: 8px; color: #303341; font-family: Manrope, sans-serif; font-size: 13px; font-weight: 800; }
+.checkin-top-brand { position: absolute; top: 27px; display: flex; align-items: center; }
+.checkin-logo { display: block; width: 200px; height: auto; }
 .checkin-top-brand .brand-mark { width: 31px; height: 31px; flex-basis: 31px; font-size: 20px; }
 .checkin-top-brand > span:last-child > span { color: #9496a1; font-size: 9px; font-weight: 500; }
 .checkin-card { display: flex; width: min(100%, 450px); flex-direction: column; align-items: center; justify-content: center; padding: 30px; margin: auto 0; border: 1px solid #eeeef2; border-radius: 14px; background: #fff; text-align: center; box-shadow: 0 10px 40px #292c410d; }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import {
   getReceptionCompanyName,
@@ -84,7 +85,7 @@ export default function CheckInPage({ params }: { params: Promise<{ token: strin
 
   return (
     <main className="checkin-screen">
-      <div className="checkin-top-brand"><span className="brand-mark">t<span>.</span></span><span>tgm<span>check-in</span></span></div>
+      <div className="checkin-top-brand"><Image className="checkin-logo" src="/tgm-logo.jpg" alt="TGM Marchnata" width={200} height={63} priority /></div>
       <section className="checkin-card">
         <div className={`checkin-symbol ${receipt ? "success" : ""}`}><span>{receipt ? "✓" : "✳"}</span></div>
         <p className="eyebrow">{loading ? "COMPANY VISITOR CHECK-IN" : companyName.toUpperCase() || "COMPANY VISITOR CHECK-IN"}</p>
