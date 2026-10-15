@@ -7,8 +7,8 @@ const codePattern = /^\d{6}$/;
 
 export async function POST(request: Request) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!supabaseUrl || !serviceRoleKey) {
+  const secretKey = process.env.SUPABASE_SECRET_KEY;
+  if (!supabaseUrl || !secretKey) {
     return NextResponse.json({ error: "Email-verified self-checkout is not configured. Please ask reception for help." }, { status: 503 });
   }
 
@@ -28,10 +28,10 @@ export async function POST(request: Request) {
   }
 
   const challengeId = input.challenge_id.toLowerCase();
-  const submittedHash = createHmac("sha256", serviceRoleKey)
+  const submittedHash = createHmac("sha256", secretKey)
     .update(`${challengeId}:${input.code}`)
     .digest("hex");
-  const serverClient = createClient(supabaseUrl, serviceRoleKey, {
+  const serverClient = createClient(supabaseUrl, secretKey, {
     auth: { autoRefreshToken: false, detectSessionInUrl: false, persistSession: false },
   });
   const { data, error } = await serverClient.rpc("verify_self_checkout_code", {

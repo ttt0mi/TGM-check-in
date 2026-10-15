@@ -9,11 +9,11 @@ const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{1
 
 export async function POST(request: Request) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const secretKey = process.env.SUPABASE_SECRET_KEY;
   const resendApiKey = process.env.RESEND_API_KEY;
   const resendFromEmail = process.env.RESEND_FROM_EMAIL;
 
-  if (!supabaseUrl || !serviceRoleKey || !resendApiKey || !resendFromEmail) {
+  if (!supabaseUrl || !secretKey || !resendApiKey || !resendFromEmail) {
     return NextResponse.json({ error: "Email-verified self-checkout is not configured. Please ask reception for help." }, { status: 503 });
   }
 
@@ -37,10 +37,10 @@ export async function POST(request: Request) {
   const email = input.email.trim().toLowerCase();
   const challengeId = randomUUID();
   const code = randomInt(0, 1_000_000).toString().padStart(6, "0");
-  const codeHash = createHmac("sha256", serviceRoleKey)
+  const codeHash = createHmac("sha256", secretKey)
     .update(`${challengeId}:${code}`)
     .digest("hex");
-  const serverClient = createClient(supabaseUrl, serviceRoleKey, {
+  const serverClient = createClient(supabaseUrl, secretKey, {
     auth: { autoRefreshToken: false, detectSessionInUrl: false, persistSession: false },
   });
   const { data, error } = await serverClient.rpc("create_self_checkout_challenge", {

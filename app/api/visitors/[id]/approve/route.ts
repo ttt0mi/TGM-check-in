@@ -23,17 +23,17 @@ function jsonError(message: string, status: number) {
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const supabasePublishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  const secretKey = process.env.SUPABASE_SECRET_KEY;
   const resendApiKey = process.env.RESEND_API_KEY;
   const resendFromEmail = process.env.RESEND_FROM_EMAIL;
   const authorization = request.headers.get("authorization");
   const accessToken = authorization?.match(/^Bearer\s+(.+)$/i)?.[1];
 
-  if (!supabaseUrl || !supabaseAnonKey) return jsonError("Visitor approvals require Supabase configuration.", 503);
+  if (!supabaseUrl || !supabasePublishableKey) return jsonError("Visitor approvals require Supabase configuration.", 503);
   if (!accessToken) return jsonError("Sign in as a workspace administrator to approve visitors.", 401);
 
-  const client = createClient(supabaseUrl, supabaseAnonKey, {
+  const client = createClient(supabaseUrl, supabasePublishableKey, {
     global: { headers: { Authorization: `Bearer ${accessToken}` } },
     auth: { autoRefreshToken: false, detectSessionInUrl: false, persistSession: false },
   });
@@ -77,11 +77,11 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       error: "Visitor approved, but email delivery is not configured. Set RESEND_API_KEY and RESEND_FROM_EMAIL, then retry the host email.",
     });
   }
-  if (!serviceRoleKey) {
-    return jsonError("Host email lookup is not configured. Set SUPABASE_SERVICE_ROLE_KEY on the server before retrying.", 503);
+  if (!secretKey) {
+    return jsonError("Host email lookup is not configured. Set SUPABASE_SECRET_KEY on the server before retrying.", 503);
   }
 
-  const serverClient = createClient(supabaseUrl, serviceRoleKey, {
+  const serverClient = createClient(supabaseUrl, secretKey, {
     auth: { autoRefreshToken: false, detectSessionInUrl: false, persistSession: false },
   });
   const { data: host, error: hostError } = await serverClient

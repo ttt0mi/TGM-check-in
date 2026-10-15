@@ -39,16 +39,16 @@ const STORAGE_KEY = "tgm-check-in-visits";
 const WORKSPACE_KEY = "tgm-check-in-workspace";
 const HOSTS_KEY = "tgm-check-in-hosts";
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabasePublishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
-export const hasSupabaseConfig = Boolean(supabaseUrl && supabaseAnonKey);
+export const hasSupabaseConfig = Boolean(supabaseUrl && supabasePublishableKey);
 
 let supabaseClient: SupabaseClient | null = null;
 
 export function getSupabase() {
   if (!hasSupabaseConfig) return null;
-  if (!supabaseClient && supabaseUrl && supabaseAnonKey) {
-    supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
+  if (!supabaseClient && supabaseUrl && supabasePublishableKey) {
+    supabaseClient = createClient(supabaseUrl, supabasePublishableKey);
   }
   return supabaseClient;
 }

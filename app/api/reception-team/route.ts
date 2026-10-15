@@ -9,17 +9,17 @@ function responseError(message: string, status: number) {
 
 async function getAdminContext(request: Request) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const supabasePublishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  const secretKey = process.env.SUPABASE_SECRET_KEY;
   const accessToken = request.headers.get("authorization")?.match(/^Bearer\s+(.+)$/i)?.[1];
-  if (!supabaseUrl || !supabaseAnonKey || !serviceRoleKey) {
+  if (!supabaseUrl || !supabasePublishableKey || !secretKey) {
     return { error: responseError("Reception team invitations require Supabase server configuration.", 503) } as const;
   }
   if (!accessToken) {
     return { error: responseError("Sign in as a company administrator to manage reception staff.", 401) } as const;
   }
 
-  const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+  const userClient = createClient(supabaseUrl, supabasePublishableKey, {
     global: { headers: { Authorization: `Bearer ${accessToken}` } },
     auth: { autoRefreshToken: false, detectSessionInUrl: false, persistSession: false },
   });
@@ -34,7 +34,7 @@ async function getAdminContext(request: Request) {
     return { error: responseError("Only company administrators can manage reception staff.", 403) } as const;
   }
 
-  const adminClient = createClient(supabaseUrl, serviceRoleKey, {
+  const adminClient = createClient(supabaseUrl, secretKey, {
     auth: { autoRefreshToken: false, detectSessionInUrl: false, persistSession: false },
   });
   return { adminClient, ownerId: data.user.id } as const;

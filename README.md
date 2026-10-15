@@ -16,10 +16,10 @@ Open [http://localhost:3000](http://localhost:3000). Without Supabase credential
 ## Supabase setup
 
 1. Create a Supabase project and copy `.env.example` to `.env.local`.
-2. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` to your project URL and publishable anon key.
+2. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` to your project URL and publishable anon key.
 3. Apply every migration in `supabase/migrations/` using the Supabase SQL editor or your migration workflow, in filename order.
 4. Enable email/password authentication in Supabase Auth. Company administrators create an account or sign in from the portal.
-5. Set `SUPABASE_SERVICE_ROLE_KEY` in the server environment for reception invitations and private host-email lookup. This secret must never use the `NEXT_PUBLIC_` prefix or be exposed to the browser.
+5. Set `SUPABASE_SECRET_KEY` in the server environment for reception invitations and private host-email lookup. This secret must never use the `NEXT_PUBLIC_` prefix or be exposed to the browser.
 6. Create a Resend account, verify a sender domain/address, and set `RESEND_API_KEY` and `RESEND_FROM_EMAIL` in the server environment. Do not prefix these values with `NEXT_PUBLIC_`.
 7. Restart the development server after changing environment variables.
 
