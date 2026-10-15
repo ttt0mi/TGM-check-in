@@ -7,6 +7,7 @@ type VisitorDetails = {
   owner_id: string;
   name: string;
   email: string;
+  phone: string | null;
   company: string;
   host_name: string;
   host_id: string | null;
@@ -42,7 +43,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const { id } = await context.params;
   const { data, error: visitorError } = await client
     .from("guests")
-    .select("id, owner_id, name, email, company, host_name, host_id, purpose, status, checked_in_at, host_notified_at")
+    .select("id, owner_id, name, email, phone, company, host_name, host_id, purpose, status, checked_in_at, host_notified_at")
     .eq("id", id)
     .single();
   if (visitorError || !data) return jsonError("Visitor not found in this workspace.", 404);
@@ -108,6 +109,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       "",
       `${visitor.name} has been approved by reception and is checked in to visit you.`,
       `Visitor email: ${visitor.email}`,
+      `Visitor phone: ${visitor.phone || "Not provided"}`,
       `Company: ${visitor.company || "Not provided"}`,
       `Purpose: ${visitor.purpose}`,
       `Arrival time: ${new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(new Date())}`,

@@ -1,11 +1,15 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 export type GuestStatus = "pending_approval" | "checked_in" | "checked_out";
+export type VisitorReportPeriod = "daily" | "weekly" | "monthly";
+
+export const VISIT_PURPOSES = ["Meeting", "Interview", "Delivery", "Client visit", "Vendor visit", "Other"] as const;
 
 export type Guest = {
   id: string;
   name: string;
   email: string;
+  phone: string | null;
   company: string;
   host_name: string;
   host_id: string | null;
@@ -17,7 +21,16 @@ export type Guest = {
   created_at: string;
 };
 
-export type NewGuest = Pick<Guest, "name" | "email" | "company" | "host_name" | "purpose">;
+export type NewGuest = {
+  first_name: string;
+  middle_name: string;
+  last_name: string;
+  email: string;
+  phone: string;
+  company: string;
+  host_name: string;
+  purpose: string;
+};
 export type EmployeeHost = { id: string; name: string; email: string; created_at: string };
 export type ReceptionWorkspace = { company_name: string; reception_token: string; owner_id: string; role: "admin" | "reception" };
 export type ReceptionMember = { user_id: string; email: string; created_at: string };
@@ -49,6 +62,7 @@ const demoGuests: Guest[] = [
     id: "4c177761-7988-48b1-95a1-0d913a8c21f3",
     name: "Olivia Rhye",
     email: "olivia@untitledui.com",
+    phone: null,
     company: "Untitled UI",
     host_name: "Alex Smith",
     host_id: "demo-host-alex",
@@ -63,6 +77,7 @@ const demoGuests: Guest[] = [
     id: "4c177761-7988-48b1-95a1-0d913a8c21f4",
     name: "Phoenix Baker",
     email: "phoenix@acme.com",
+    phone: null,
     company: "Acme Inc.",
     host_name: "Jordan Lee",
     host_id: "demo-host-jordan",
@@ -77,6 +92,7 @@ const demoGuests: Guest[] = [
     id: "4c177761-7988-48b1-95a1-0d913a8c21f5",
     name: "Lana Steiner",
     email: "lana@circooles.com",
+    phone: null,
     company: "Circooles",
     host_name: "Alex Smith",
     host_id: "demo-host-alex",
@@ -91,6 +107,7 @@ const demoGuests: Guest[] = [
     id: "4c177761-7988-48b1-95a1-0d913a8c21f6",
     name: "Demi Wilkinson",
     email: "demi@layers.com",
+    phone: null,
     company: "Layers",
     host_name: "Sam Rivera",
     host_id: "demo-host-sam",
@@ -105,6 +122,7 @@ const demoGuests: Guest[] = [
     id: "4c177761-7988-48b1-95a1-0d913a8c21f7",
     name: "Candice Wu",
     email: "candice@catalog.com",
+    phone: null,
     company: "Catalog",
     host_name: "Morgan Chen",
     host_id: "demo-host-morgan",
@@ -124,11 +142,15 @@ const demoHosts: EmployeeHost[] = [
   { id: "demo-host-morgan", name: "Morgan Chen", email: "morgan@example.invalid", created_at: minutesAgo(500) },
 ];
 
-function getTodayRange() {
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
+function getReportRange(period: VisitorReportPeriod) {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if (period === "weekly") start.setDate(start.getDate() - start.getDay());
+  if (period === "monthly") start.setDate(1);
   const end = new Date(start);
-  end.setDate(end.getDate() + 1);
+  if (period === "daily") end.setDate(end.getDate() + 1);
+  if (period === "weekly") end.setDate(end.getDate() + 7);
+  if (period === "monthly") end.setMonth(end.getMonth() + 1);
   return { start: start.toISOString(), end: end.toISOString() };
 }
 
@@ -147,18 +169,19 @@ function saveLocalGuests(guests: Guest[]) {
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(guests));
 }
 
-export async function listGuests(): Promise<Guest[]> {
+export async function listGuests(period: VisitorReportPeriod = "daily"): Promise<Guest[]> {
   const client = getSupabase();
-  const { start, end } = getTodayRange();
+  const { start, end } = getReportRange(period);
   if (!client) {
     return loadLocalGuests()
       .filter((guest) => guest.created_at >= start && guest.created_at < end)
+      .map((guest) => ({ ...guest, phone: guest.phone ?? null }))
       .sort((first, second) => second.created_at.localeCompare(first.created_at));
   }
 
   const { data, error } = await client
     .from("guests")
-    .select("id, name, email, company, host_name, host_id, purpose, status, checked_in_at, checked_out_at, host_notified_at, created_at")
+    .select("id, name, email, phone, company, host_name, host_id, purpose, status, checked_in_at, checked_out_at, host_notified_at, created_at")
     .gte("created_at", start)
     .lt("created_at", end)
     .order("created_at", { ascending: false });
@@ -250,8 +273,11 @@ export async function registerVisitor(
   if (client) {
     const { data, error } = await client.rpc("register_visitor_by_qr", {
       reception_token: receptionToken,
-      visitor_name: input.name,
+      visitor_first_name: input.first_name,
+      visitor_middle_name: input.middle_name || null,
+      visitor_last_name: input.last_name,
       visitor_email: input.email,
+      visitor_phone: input.phone,
       visitor_company: input.company,
       visitor_host: input.host_name,
       visit_purpose: input.purpose,
@@ -266,8 +292,13 @@ export async function registerVisitor(
   if (!host) throw new Error("That employee is no longer in the host directory. Please select another host.");
   const created_at = new Date().toISOString();
   const guests = loadLocalGuests();
+  const name = [input.first_name, input.middle_name, input.last_name].filter(Boolean).join(" ");
   const guest: Guest = {
-    ...input,
+    name,
+    email: input.email,
+    phone: input.phone,
+    company: input.company,
+    purpose: input.purpose,
     host_name: host.name,
     host_id: host.id,
     id: crypto.randomUUID(),

@@ -20,9 +20,11 @@ import {
   inviteReceptionMember,
   setGuestStatus,
   updateCompanyName,
+  VISIT_PURPOSES,
   type EmployeeHost,
   type Guest,
   type GuestStatus,
+  type VisitorReportPeriod,
 } from "../lib/guests";
 
 type IconName = "grid" | "users" | "chart" | "settings" | "search" | "plus" | "arrow" | "check" | "clock" | "close" | "download" | "logout" | "qr";
@@ -77,6 +79,19 @@ function formatToday() {
   return new Intl.DateTimeFormat("en", { weekday: "long", month: "long", day: "numeric", year: "numeric" }).format(new Date());
 }
 
+function formatReportRange(period: VisitorReportPeriod) {
+  const today = new Date();
+  if (period === "daily") return formatToday();
+  if (period === "monthly") {
+    return new Intl.DateTimeFormat("en", { month: "long", year: "numeric" }).format(today);
+  }
+  const start = new Date(today.getFullYear(), today.getMonth(), today.getDate() - today.getDay());
+  const end = new Date(start);
+  end.setDate(end.getDate() + 6);
+  const formatDay = (date: Date) => new Intl.DateTimeFormat("en", { month: "short", day: "numeric" }).format(date);
+  return `${formatDay(start)} - ${formatDay(end)}, ${end.getFullYear()}`;
+}
+
 export default function Home() {
   const [guests, setGuests] = useState<Guest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -97,8 +112,12 @@ export default function Home() {
   const [accessError, setAccessError] = useState("");
   const [hostNames, setHostNames] = useState<string[]>([]);
   const [page, setPage] = useState("Overview");
+  const [reportPeriod, setReportPeriod] = useState<VisitorReportPeriod>("daily");
+  const [reportGuests, setReportGuests] = useState<Guest[]>([]);
+  const [reportLoading, setReportLoading] = useState(false);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all");
+  const [reportPurpose, setReportPurpose] = useState("all");
   const [showAdd, setShowAdd] = useState(false);
   const [showQr, setShowQr] = useState(false);
   const [error, setError] = useState("");
@@ -163,6 +182,20 @@ export default function Home() {
   }, [authReady, refreshGuests, session]);
 
   useEffect(() => {
+    if (page !== "Analytics") return;
+    let active = true;
+    setReportLoading(true);
+    listGuests(reportPeriod).then((visitors) => {
+      if (active) setReportGuests(visitors);
+    }).catch((cause: unknown) => {
+      if (active) setError(cause instanceof Error ? cause.message : "Unable to load the visitor report.");
+    }).finally(() => {
+      if (active) setReportLoading(false);
+    });
+    return () => { active = false; };
+  }, [guests, page, reportPeriod]);
+
+  useEffect(() => {
     if (!hasSupabaseConfig || !session) return;
     const client = getSupabase();
     if (!client) return;
@@ -198,11 +231,25 @@ export default function Home() {
     pending: guests.filter((guest) => guest.status === "pending_approval").length,
   }), [guests]);
 
+  const purposeFilteredReportGuests = useMemo(
+    () => reportGuests.filter((guest) => reportPurpose === "all" || guest.purpose === reportPurpose),
+    [reportGuests, reportPurpose],
+  );
+  const reportPurposes = useMemo(
+    () => [...new Set([...VISIT_PURPOSES, ...reportGuests.map((guest) => guest.purpose)])],
+    [reportGuests],
+  );
+  const reportStats = useMemo(() => ({
+    total: purposeFilteredReportGuests.filter((guest) => guest.status === "checked_in" || guest.status === "checked_out").length,
+    onSite: purposeFilteredReportGuests.filter((guest) => guest.status === "checked_in").length,
+    checkedOut: purposeFilteredReportGuests.filter((guest) => guest.status === "checked_out").length,
+  }), [purposeFilteredReportGuests]);
+
   const filteredGuests = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     return guests.filter((guest) => {
       const matchesQuery = !normalizedQuery || [
-        guest.name, guest.email, guest.company, guest.host_name, guest.purpose,
+        guest.name, guest.email, guest.phone ?? "", guest.company, guest.host_name, guest.purpose,
       ].some((value) => value.toLowerCase().includes(normalizedQuery));
       return matchesQuery && (filter === "all" || guest.status === filter);
     });
@@ -222,10 +269,10 @@ export default function Home() {
   const maxArrivals = Math.max(3, ...arrivalHours.map((item) => item.count));
   const hostCounts = useMemo(() => {
     const counts = new Map<string, number>();
-    guests.filter((guest) => guest.status === "checked_in" || guest.status === "checked_out")
+    purposeFilteredReportGuests.filter((guest) => guest.status === "checked_in" || guest.status === "checked_out")
       .forEach((guest) => counts.set(guest.host_name, (counts.get(guest.host_name) ?? 0) + 1));
     return [...counts.entries()].sort((first, second) => second[1] - first[1]).slice(0, 5);
-  }, [guests]);
+  }, [purposeFilteredReportGuests]);
 
   async function handleAuth(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -253,19 +300,25 @@ export default function Home() {
     setFormError("");
     setSaving(true);
     const form = new FormData(event.currentTarget);
-    const name = String(form.get("name") ?? "").trim();
+    const first_name = String(form.get("first_name") ?? "").trim();
+    const middle_name = String(form.get("middle_name") ?? "").trim();
+    const last_name = String(form.get("last_name") ?? "").trim();
     const email = String(form.get("email") ?? "").trim();
+    const phone = String(form.get("phone") ?? "").trim();
     const host_name = String(form.get("host_name") ?? "").trim();
     const purpose = String(form.get("purpose") ?? "").trim();
-    if (!name || !email || !host_name || !purpose) {
+    if (!first_name || !last_name || !email || !phone || !host_name || !purpose) {
       setFormError("Enter the visitor's details, host, and visit purpose.");
       setSaving(false);
       return;
     }
     try {
       await addGuest({
-        name,
+        first_name,
+        middle_name,
+        last_name,
         email,
+        phone,
         company: String(form.get("company") ?? "").trim(),
         host_name,
         purpose,
@@ -423,13 +476,48 @@ export default function Home() {
 
           {page === "Visitors" && <><section className="page-heading"><div><p className="eyebrow">TODAY&apos;S VISITOR LOG</p><h1>Visitors</h1><p className="heading-subtitle">Review arrivals, approve visitors, and manage who is on site.</p></div><button className="primary-button" onClick={() => setShowAdd(true)}><Icon name="plus" size={17} /> Add visitor</button></section><GuestTable guests={filteredGuests} loading={loading} query={query} setQuery={setQuery} filter={filter} setFilter={setFilter} onAdd={() => setShowAdd(true)} onStatus={changeStatus} onApprove={approveVisitor} approvingId={approvingId} canNotifyHost={hasSupabaseConfig} /></>}
 
-          {page === "Analytics" && <><section className="page-heading"><div><p className="eyebrow">DAILY VISITOR REPORT</p><h1>Visitor report</h1><p className="heading-subtitle">Office visitor activity for {formatToday()}.</p></div></section><section className="stats-grid"><StatCard label="Total visits" value={stats.total} caption="Recorded today" icon="users" color="lavender" trend="Today" /><StatCard label="Currently on site" value={stats.onSite} caption="Visitors in the office" icon="check" color="mint" trend="On site" /><StatCard label="Visits completed" value={stats.checkedOut} caption="Checked out today" icon="clock" color="peach" trend="Completed" /></section><section className="panel analytics-table"><div className="panel-heading"><div><h2>Visits by host</h2><p>Employees welcoming visitors today</p></div></div><div className="analytics-bars">{hostCounts.length ? hostCounts.map(([host, count]) => <div className="analytics-row" key={host}><span>{host}</span><div className="analytics-track"><i style={{ width: `${stats.total ? count / stats.total * 100 : 0}%`, background: "#5968de" }} /></div><strong>{count}</strong></div>) : <p className="settings-heading">No visitor activity recorded today.</p>}</div></section></>}
+          {page === "Analytics" && <>
+            <section className="page-heading"><div><p className="eyebrow">{reportPeriod.toUpperCase()} VISITOR REPORT</p><h1>Visitor report</h1><p className="heading-subtitle">Office visitor activity for {formatReportRange(reportPeriod)}.</p></div></section>
+            <section className="report-filter-row">
+              <label htmlFor="report-period-filter">Report period</label>
+              <select id="report-period-filter" className="filter-select" value={reportPeriod} onChange={(event) => setReportPeriod(event.target.value as VisitorReportPeriod)}>
+                <option value="daily">Daily</option><option value="weekly">Weekly (Sunday-Saturday)</option><option value="monthly">Monthly</option>
+              </select>
+              <label htmlFor="report-purpose-filter">Filter by purpose</label>
+              <select id="report-purpose-filter" className="filter-select" value={reportPurpose} onChange={(event) => setReportPurpose(event.target.value)}>
+                <option value="all">All purposes</option>
+                {reportPurposes.map((purpose) => <option key={purpose} value={purpose}>{purpose}</option>)}
+              </select>
+            </section>
+            <section className="stats-grid">
+              <StatCard label="Total visits" value={reportStats.total} caption="Recorded in this period" icon="users" color="lavender" trend={reportPurpose === "all" ? reportPeriod : reportPurpose} />
+              <StatCard label="Currently on site" value={reportStats.onSite} caption="Visitors in the office" icon="check" color="mint" trend="On site" />
+              <StatCard label="Visits completed" value={reportStats.checkedOut} caption="Checked out in this period" icon="clock" color="peach" trend="Completed" />
+            </section>
+            <section className="panel guest-panel daily-report-table">
+              <div className="guest-panel-heading"><div><div className="title-with-count"><h2>{reportPeriod === "daily" ? "Daily visitors" : reportPeriod === "weekly" ? "Weekly visitors" : "Monthly visitors"}</h2><span className="table-count">{purposeFilteredReportGuests.length}</span></div><p>{reportPurpose === "all" ? `All visitor requests for this ${reportPeriod === "daily" ? "day" : reportPeriod === "weekly" ? "week" : "month"}` : `${reportPurpose} visits for this ${reportPeriod === "daily" ? "day" : reportPeriod === "weekly" ? "week" : "month"}`}</p></div></div>
+              <div className="table-scroll"><table>
+                <thead><tr><th>VISITOR</th><th>PURPOSE</th><th>VISITING</th><th>COMPANY</th><th>STATUS</th><th>ARRIVAL</th></tr></thead>
+                <tbody>
+                  {reportLoading ? <tr><td colSpan={6} className="table-message"><span className="spinner" />Loading saved visitor records…</td></tr>
+                    : purposeFilteredReportGuests.length === 0 ? <tr><td colSpan={6} className="table-message">No visitors found for this purpose during this period.</td></tr>
+                      : purposeFilteredReportGuests.map((guest, index) => <tr key={guest.id}>
+                        <td><div className="guest-cell"><span className={`guest-avatar ${avatarColors[index % avatarColors.length]}`}>{initials(guest.name)}</span><span className="guest-name-cell"><strong>{guest.name}</strong><small>{guest.email}</small>{guest.phone && <small>{guest.phone}</small>}</span></div></td>
+                        <td>{guest.purpose}</td><td className="company-cell">{guest.host_name}</td><td className="company-cell">{guest.company || "—"}</td>
+                        <td><span className={`status-pill ${guest.status}`}><i />{statusLabels[guest.status]}</span></td><td className="arrival-cell">{formatTime(guest.checked_in_at)}</td>
+                      </tr>)}
+                </tbody>
+              </table></div>
+              <div className="table-footer"><span>Showing <strong>{purposeFilteredReportGuests.length}</strong> visitor{purposeFilteredReportGuests.length === 1 ? "" : "s"}</span><span>{formatReportRange(reportPeriod)}</span></div>
+            </section>
+            <section className="panel analytics-table"><div className="panel-heading"><div><h2>Visits by host</h2><p>Employees welcoming visitors in this period</p></div></div><div className="analytics-bars">{hostCounts.length ? hostCounts.map(([host, count]) => <div className="analytics-row" key={host}><span>{host}</span><div className="analytics-track"><i style={{ width: `${reportStats.total ? count / reportStats.total * 100 : 0}%`, background: "#5968de" }} /></div><strong>{count}</strong></div>) : <p className="settings-heading">No visitor activity recorded in this period.</p>}</div></section>
+          </>}
 
           {page === "Settings" && accessRole === "admin" && <SettingsPanel configured={hasSupabaseConfig} companyName={companyName} onShowQr={() => setShowQr(true)} onSaveCompanyName={saveCompanyName} onHostsChanged={async () => { const hosts = await listEmployeeHosts(); setHostNames(hosts.map((host) => host.name)); }} />}
         </div>
       </main>
 
-      {showAdd && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowAdd(false); }}><section className="modal" role="dialog" aria-modal="true" aria-labelledby="add-visitor-title"><div className="modal-heading"><div><p className="eyebrow">RECEPTION</p><h2 id="add-visitor-title">Add a visitor</h2><p>Record a visitor who is arriving at the office.</p></div><button className="icon-button" aria-label="Close" onClick={() => setShowAdd(false)}><Icon name="close" /></button></div><form className="guest-form" onSubmit={handleAddVisitor}><label>Full name<input name="name" placeholder="e.g. Jordan Lee" autoComplete="name" required maxLength={120} /></label><label>Email address<input name="email" type="email" placeholder="jordan@company.com" autoComplete="email" required maxLength={254} /></label><label>Company <span className="optional-label">Optional</span><input name="company" placeholder="e.g. Acme Inc." autoComplete="organization" maxLength={120} /></label><label>Who are they visiting?<select name="host_name" required defaultValue=""><option value="" disabled>Select an employee</option>{hostNames.map((host) => <option key={host} value={host}>{host}</option>)}</select></label><label>Purpose of visit<input name="purpose" placeholder="e.g. Meeting, interview, delivery" required maxLength={240} /></label>{formError && <p className="form-error" role="alert">{formError}</p>}<div className="modal-actions"><button type="button" className="secondary-button" onClick={() => setShowAdd(false)}>Cancel</button><button type="submit" className="primary-button" disabled={saving || hostNames.length === 0}>{saving ? <><span className="button-spinner" /> Submitting…</> : <><Icon name="plus" size={16} /> Add for approval</>}</button></div></form></section></div>}
+      {showAdd && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowAdd(false); }}><section className="modal" role="dialog" aria-modal="true" aria-labelledby="add-visitor-title"><div className="modal-heading"><div><p className="eyebrow">RECEPTION</p><h2 id="add-visitor-title">Add a visitor</h2><p>Record a visitor who is arriving at the office.</p></div><button className="icon-button" aria-label="Close" onClick={() => setShowAdd(false)}><Icon name="close" /></button></div><form className="guest-form" onSubmit={handleAddVisitor}><label>First name<input name="first_name" placeholder="e.g. Jordan" autoComplete="given-name" required maxLength={120} /></label><label>Middle name <span className="optional-label">Optional</span><input name="middle_name" placeholder="e.g. Taylor" autoComplete="additional-name" maxLength={120} /></label><label>Last name<input name="last_name" placeholder="e.g. Lee" autoComplete="family-name" required maxLength={120} /></label><label>Email address<input name="email" type="email" placeholder="jordan@company.com" autoComplete="email" required maxLength={254} /></label><label>Phone number<input name="phone" type="tel" placeholder="e.g. +1 555 123 4567" autoComplete="tel" required maxLength={32} /></label><label>Company <span className="optional-label">Optional</span><input name="company" placeholder="e.g. Acme Inc." autoComplete="organization" maxLength={120} /></label><label>Who are they visiting?<select name="host_name" required defaultValue=""><option value="" disabled>Select an employee</option>{hostNames.map((host) => <option key={host} value={host}>{host}</option>)}</select></label><label>Purpose of visit<select name="purpose" required defaultValue=""><option value="" disabled>Select a purpose</option>{VISIT_PURPOSES.map((purpose) => <option key={purpose} value={purpose}>{purpose}</option>)}</select></label>{formError && <p className="form-error" role="alert">{formError}</p>}<div className="modal-actions"><button type="button" className="secondary-button" onClick={() => setShowAdd(false)}>Cancel</button><button type="submit" className="primary-button" disabled={saving || hostNames.length === 0}>{saving ? <><span className="button-spinner" /> Submitting…</> : <><Icon name="plus" size={16} /> Add for approval</>}</button></div></form></section></div>}
 
       {showQr && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowQr(false); }}><section className="modal qr-modal" role="dialog" aria-modal="true" aria-labelledby="qr-title"><div className="modal-heading"><div><p className="eyebrow">RECEPTION CHECK-IN</p><h2 id="qr-title">Your company QR code</h2><p>Display this reusable code at your reception desk.</p></div><button className="icon-button" aria-label="Close" onClick={() => setShowQr(false)}><Icon name="close" /></button></div><div className="qr-code-wrap" id="reception-qr">{receptionToken ? <QRCodeSVG value={getReceptionUrl()} size={220} level="H" includeMargin bgColor="#ffffff" fgColor="#202425" /> : <span className="spinner" />}</div><p className="qr-caption">Visitors scan to enter their details and check in at <strong>{companyName || "your office"}</strong>.</p><button className="primary-button full-button" onClick={downloadReceptionQr} disabled={!receptionToken}><Icon name="download" size={16} /> Download reception QR</button></section></div>}
     </div>
@@ -482,7 +570,7 @@ function GuestTable({
           {loading ? <tr><td colSpan={7} className="table-message"><span className="spinner" />Loading today&apos;s visitors…</td></tr>
             : guests.length === 0 ? <tr><td colSpan={7} className="table-message"><div className="empty-state"><span className="empty-icon"><Icon name="users" size={21} /></span><strong>No visitors found</strong><span>Try another search or add a visitor to today&apos;s log.</span><button className="primary-button" onClick={onAdd}><Icon name="plus" size={16} /> Add visitor</button></div></td></tr>
               : guests.map((guest, index) => <tr key={guest.id}>
-                <td><div className="guest-cell"><span className={`guest-avatar ${avatarColors[index % avatarColors.length]}`}>{initials(guest.name)}</span><span className="guest-name-cell"><strong>{guest.name}</strong><small>{guest.email}</small></span></div></td>
+                <td><div className="guest-cell"><span className={`guest-avatar ${avatarColors[index % avatarColors.length]}`}>{initials(guest.name)}</span><span className="guest-name-cell"><strong>{guest.name}</strong><small>{guest.email}</small>{guest.phone && <small>{guest.phone}</small>}</span></div></td>
                 <td><span className={`status-pill ${guest.status}`}><i />{statusLabels[guest.status]}</span>{guest.status === "checked_in" && guest.host_notified_at && <small className="notification-sent">Host notified</small>}</td>
                 <td className="arrival-cell">{formatTime(guest.checked_in_at)}</td><td className="company-cell">{guest.host_name}</td><td className="company-cell">{guest.company || "—"}</td><td className="company-cell" title={guest.purpose}>{guest.purpose}</td>
                 <td><div className="row-actions">

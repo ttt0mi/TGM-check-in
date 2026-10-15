@@ -27,15 +27,19 @@ Visitor records are protected by row-level security and belong to the company ad
 
 Add employee names and work email addresses under **Settings → Employee host directory**. The public QR form exposes employee names only, never their email addresses. An administrator approves arrivals from the visitor log; the server-side approval endpoint then emails the selected employee through Resend. If email delivery fails after approval, the administrator can retry it from the visitor row. Demo mode supports the approval flow locally but never sends real email.
 
+Visitors can also select **Check out** on the reception QR page. The portal emails a one-time code to the address on their active visit; the code expires after 10 minutes, allows up to 6 attempts, and checkout codes are limited to 3 requests per visitor every 10 minutes. Apply `20261015120000_add_self_checkout_verification.sql` and configure Supabase plus Resend for this feature. It is intentionally unavailable in browser-only demo mode.
+
 Company administrators can invite reception staff under **Settings → Reception team access**. Invited staff receive a Supabase Auth email to set up their password and sign in with their own account. They can view the visitor log, approve arrivals, and check visitors out; only the workspace owner can change company settings, employee hosts, or team access. Supabase row-level security enforces these workspace and role boundaries.
 
 ## Features
 
 - Daily reception dashboard showing today's visitors, visitors currently on site, and completed visits.
 - Reusable company reception QR code and mobile visitor request form.
-- Visitor name, email, company, employee host, and visit purpose.
+- Visitor first and last name, optional middle name, phone number, email, company, employee host, and visit purpose.
 - Admin approval queue, host email notifications, visitor log, status filters, and manual check-in/check-out.
+- Visitor self-checkout from the reception QR page using an emailed one-time verification code.
 - Employee directory with host names and work email addresses.
+- Daily, weekly (Sunday–Saturday), and monthly reports calculated from stored visitor records, filterable by visit purpose.
 - Today's arrival chart, attendance status, and visits-by-host report.
 - Supabase Auth, owner-scoped Postgres storage, and Realtime dashboard updates.
 - Browser-local demo mode when Supabase is not configured.

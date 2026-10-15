@@ -224,6 +224,8 @@ tbody tr:last-child td { border-bottom: 0; }
 .analytics-track { height: 10px; overflow: hidden; border-radius: 10px; background: #f2f2f5; }
 .analytics-track > i { display: block; height: 100%; border-radius: inherit; }
 .analytics-row > strong { color: #50535c; text-align: right; font-size: 10px; }
+.report-filter-row { display: flex; align-items: center; gap: 9px; margin: -8px 0 18px; color: #686b75; font-size: 10px; }
+.daily-report-table { max-width: none; }
 .settings-card { max-width: 760px; padding: 20px; margin-bottom: 14px; }
 .settings-heading { display: flex; align-items: center; gap: 12px; }
 .settings-status-icon { display: grid; width: 39px; height: 39px; flex: 0 0 39px; place-items: center; border-radius: 9px; background: var(--navy-soft); color: var(--navy); }
@@ -299,6 +301,11 @@ tbody tr:last-child td { border-bottom: 0; }
 .visitor-form select { min-height: 39px; font-size: 12px; }
 .visitor-form .form-error { text-align: left; }
 .confirm-checkin { min-height: 42px; }
+.checkin-mode-toggle { display: grid; width: 100%; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; margin: 0 0 17px; border: 1px solid var(--line); border-radius: 7px; background: #f5f6f8; }
+.checkin-mode-toggle button { min-height: 31px; border: 0; border-radius: 5px; background: transparent; color: var(--gray-text); font-size: 10px; font-weight: 600; cursor: pointer; }
+.checkin-mode-toggle button.active { background: #fff; color: var(--navy); box-shadow: 0 1px 3px #171b2218; }
+.checkout-back, .checkout-change-email { justify-content: center; width: 100%; padding: 5px; font-size: 10px; }
+.checkout-back { margin-top: 13px; }
 .checkin-card .welcome-badge { padding: 8px 11px; border-radius: 20px; background: var(--navy-soft); color: var(--navy); font-size: 10px; font-weight: 600; }
 .checkin-footer { margin: 20px 0 0; color: #92949d; text-align: center; font-size: 9px; }
 .checkin-footer strong { color: #676a74; font-weight: 600; }
