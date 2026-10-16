@@ -38,3 +38,6 @@ next-env.d.ts
 
 # vscode extensions
 .history
+
+# supabase
+tmp/
