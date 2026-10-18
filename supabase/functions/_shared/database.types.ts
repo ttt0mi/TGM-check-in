@@ -682,9 +682,14 @@ export type Database = {
         }
         Returns: boolean
       }
+      tgm_mark_stale_host_email: {
+        Args: { p_actor_id: string; p_visit_id: string }
+        Returns: number
+      }
       tgm_create_assisted_visit: {
         Args: {
           p_actor_id: string
+          p_idempotency_key: string
           p_department_id: string
           p_location_id: string
           p_organization: string
