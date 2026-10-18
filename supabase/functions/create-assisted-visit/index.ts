@@ -25,6 +25,7 @@ export default {
 				return json({ error: "Method not allowed" }, 405);
 			const operator = await authenticatedOperator(ctx);
 			const body = await readJson(req);
+			const idempotencyKey = uuid(body.idempotency_key, "idempotency key");
 			const locationId = uuid(body.location_id, "location");
 			requireLocationAccess(operator, locationId);
 			const departmentId =
@@ -56,6 +57,7 @@ export default {
 			const { data: visitId, error } = await operator.service.rpc(
 				"tgm_create_assisted_visit", {
 					p_actor_id: operator.userId,
+					p_idempotency_key: idempotencyKey,
 					p_location_id: locationId,
 					p_department_id: departmentId,
 					p_staff_id: staffId,
