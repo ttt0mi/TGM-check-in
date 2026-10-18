@@ -20,9 +20,27 @@ export async function readJson(
 	req: Request,
 	maxBytes = 16_384,
 ): Promise<JsonObject> {
-	const body = await req.text();
-	if (new TextEncoder().encode(body).length > maxBytes)
-		throw new HttpError(413, "Request too large");
+	const reader = req.body?.getReader();
+	const decoder = new TextDecoder();
+	let body = "";
+	let size = 0;
+	if (reader) {
+		try {
+			while (true) {
+				const { done, value } = await reader.read();
+				if (done) break;
+				size += value.byteLength;
+				if (size > maxBytes) {
+					await reader.cancel().catch(() => {});
+					throw new HttpError(413, "Request too large");
+				}
+				body += decoder.decode(value, { stream: true });
+			}
+			body += decoder.decode();
+		} finally {
+			reader.releaseLock();
+		}
+	}
 	let parsed: unknown;
 	try {
 		parsed = JSON.parse(body);
