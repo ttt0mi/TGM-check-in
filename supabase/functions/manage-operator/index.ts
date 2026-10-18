@@ -39,19 +39,8 @@ export default {
 				throw new HttpError(400, "Admins cannot have a reception assignment");
 			}
 
-			// Deactivate the live profile first so all RLS and Edge checks reject an
-			// already-issued JWT even if the Auth ban API is temporarily unavailable.
-			if (action === "assign") {
-				const { error } = await operator.service.auth.admin.updateUserById(
-					targetId,
-					{ ban_duration: "none" },
-				);
-				if (error)
-					throw new HttpError(
-						400,
-						"Account not found or could not be unbanned",
-					);
-			}
+			// The live profile is the authorization source of truth. Do not change
+			// Auth bans here: they cannot be committed atomically with this RPC.
 			const args = {
 					p_actor_id: operator.userId,
 					p_target_id: targetId,
@@ -70,20 +59,7 @@ export default {
 				}
 				throw error;
 			}
-			if (action === "deactivate") {
-				const { error: banError } =
-					await operator.service.auth.admin.updateUserById(targetId, {
-						ban_duration: "876000h",
-					});
-				if (banError) {
-					console.error(
-						"Operator blocked by RLS but Auth ban failed",
-						banError,
-					);
-					return json({ profile: data, auth_ban_pending: true }, 202);
-				}
-			}
-			return json({ profile: data, auth_ban_pending: false });
+			return json({ profile: data });
 		} catch (error) {
 			return failure(error);
 		}
