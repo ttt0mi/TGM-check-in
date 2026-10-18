@@ -41,12 +41,21 @@ function htmlEscape(value: string): string {
 
 export default {
 	fetch: withSupabase<Database>({ auth: "user" }, async (req, ctx) => {
+		let finalizeOnError: (() => Promise<void>) | null = null;
 		try {
 			if (req.method !== "POST")
 				return json({ error: "Method not allowed" }, 405);
 			const operator = await authenticatedOperator(ctx);
 			const body = await readJson(req);
 			const visitId = uuid(body.visit_id, "visit");
+			const { error: staleError } = await operator.service.rpc("tgm_mark_stale_host_email", {
+				p_actor_id: operator.userId,
+				p_visit_id: visitId,
+			});
+			if (staleError) {
+				if (staleError.code === "P0001") throw new HttpError(403, "Location access denied");
+				throw staleError;
+			}
 
 			// Missing deployment configuration must never create an attempt or send a
 			// link to an unhosted page. This is intentionally fail-closed for launch.
@@ -74,6 +83,18 @@ export default {
 					throw new HttpError(409, prepareError.message);
 				throw prepareError;
 			}
+			let providerStatus: "sent" | "failed" | "unknown" = "failed";
+			let providerId: string | null = null;
+			let errorCode: string | null = "pre_send_failure";
+			finalizeOnError = async () => {
+				const { error } = await operator.service.rpc("tgm_finish_host_email", {
+					p_attempt_id: attemptId,
+					p_status: providerStatus,
+					p_provider_message_id: providerId ?? undefined,
+					p_error_code: errorCode ?? undefined,
+				});
+				if (error) console.error("Could not finalize email attempt", error);
+			};
 			const [visitResult, attemptResult] = await Promise.all([
 				operator.service
 					.from("visits")
@@ -121,10 +142,10 @@ export default {
 					`<p><a href="${htmlEscape(decisionUrl.toString())}">Acknowledge or decline this visit</a></p>` +
 					"<p>This single-use link expires at the end of the visit day. Reception must still admit the visitor after approval.</p>",
 			};
-			let providerStatus: "sent" | "failed" | "unknown" = "unknown";
-			let providerId: string | null = null;
-			let errorCode: string | null = null;
 			try {
+				// Once the request starts, a timeout or server failure is ambiguous.
+				providerStatus = "unknown";
+				errorCode = "provider_outcome_unknown";
 				const response = await fetch("https://api.resend.com/emails", {
 					method: "POST",
 					headers: {
@@ -138,8 +159,10 @@ export default {
 				if (response.ok && result.id) {
 					providerStatus = "sent";
 					providerId = result.id;
+					errorCode = null;
 				} else {
-					providerStatus = "failed";
+					// A non-success response does not prove the provider did not accept
+					// the message. Preserve the token and block automatic resends.
 					errorCode = `resend_http_${response.status}`;
 				}
 			} catch (error) {
@@ -156,6 +179,7 @@ export default {
 				},
 			);
 			if (finishError) throw finishError;
+			finalizeOnError = null;
 			if (providerStatus === "sent") return json({ status: "sent" });
 			if (providerStatus === "failed")
 				throw new HttpError(502, "Email failed; reception may retry");
@@ -164,6 +188,13 @@ export default {
 				"Email outcome is uncertain; review before retrying",
 			);
 		} catch (error) {
+			if (finalizeOnError) {
+				try {
+					await finalizeOnError();
+				} catch (finalizeError) {
+					console.error("Could not finalize email attempt", finalizeError);
+				}
+			}
 			return failure(error);
 		}
 	}),
