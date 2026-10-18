@@ -70,23 +70,6 @@ export default {
 			);
 			const clientIp =
 				req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
-			const timeWindow = new Date(
-				Math.floor(Date.now() / 300_000) * 300_000,
-			).toISOString();
-			const hash = await sha256Hex(
-				`${env("TURNSTILE_SECRET_KEY")}:${clientIp}:${location}`,
-			);
-			const { data: allowed, error: rateError } = await service.rpc(
-				"tgm_consume_public_rate_limit", {
-					p_request_key_hash: `\\x${hash}`,
-					p_window_start: timeWindow,
-					p_limit: 5,
-				},
-			);
-			if (rateError) throw rateError;
-			if (!allowed)
-				throw new HttpError(429, "Please wait before submitting again");
-
 			const verification = new FormData();
 			verification.set("secret", env("TURNSTILE_SECRET_KEY"));
 			verification.set("response", turnstileToken);
@@ -108,6 +91,32 @@ export default {
 			if (expectedHostname && verdict.hostname !== expectedHostname) {
 				throw new HttpError(400, "Verification hostname mismatch");
 			}
+
+			// Do not create rate-limit rows for invalid tokens or arbitrary QR values.
+			const { data: activeLocation, error: locationError } = await service
+				.from("locations")
+				.select("id")
+				.eq("public_slug", location)
+				.eq("is_active", true)
+				.maybeSingle();
+			if (locationError) throw locationError;
+			if (!activeLocation) throw new HttpError(400, "Location unavailable");
+			const timeWindow = new Date(
+				Math.floor(Date.now() / 300_000) * 300_000,
+			).toISOString();
+			const hash = await sha256Hex(
+				`${env("TURNSTILE_SECRET_KEY")}:${clientIp}:${activeLocation.id}`,
+			);
+			const { data: allowed, error: rateError } = await service.rpc(
+				"tgm_consume_public_rate_limit", {
+					p_request_key_hash: `\\x${hash}`,
+					p_window_start: timeWindow,
+					p_limit: 30,
+				},
+			);
+			if (rateError) throw rateError;
+			if (!allowed)
+				throw new HttpError(429, "Please wait before submitting again");
 
 			const { error: createError } = await service.rpc(
 				"tgm_create_public_visit", {
