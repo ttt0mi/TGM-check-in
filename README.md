@@ -109,6 +109,12 @@ Clients must generate a UUID `idempotency_key` for each assisted check-in and
 reuse it with the same request body when retrying. A different request or actor
 cannot reuse that key. The key is retained for the lifetime of its visit.
 
+Public check-ins also need a new UUID `idempotency_key` for each new visit.
+Retry the same details with the same key; changing the details requires a new
+key. Reusing a key with different details returns HTTP 409 rather than accepting
+the wrong visit. A completed retry does not need a new Turnstile token. Keys are
+retained for the lifetime of their visit.
+
 
 ## Local development
 
