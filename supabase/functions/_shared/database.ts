@@ -40,6 +40,19 @@ export type Database = Omit<GeneratedDatabase, "public"> & {
 					p_visitor_preferred_name: string | null;
 				}
 			>;
+			tgm_public_visit_retry_matches: {
+				Args: WithArgs<
+					"tgm_create_public_visit",
+					{
+						p_department_id: string | null;
+						p_organization: string | null;
+						p_staff_id: string | null;
+						p_visitor_email: string | null;
+						p_visitor_preferred_name: string | null;
+					}
+				>["Args"];
+				Returns: boolean;
+			};
 		};
 	};
 };
