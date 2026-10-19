@@ -83,6 +83,20 @@ verify_jwt = false
 [functions.respond-to-host-visit]
 verify_jwt = false
 
+# Operator functions require a signed-in user at the gateway as well as the
+# live profile and role checks inside each handler.
+[functions.manage-operator]
+verify_jwt = true
+
+[functions.reception-visit-action]
+verify_jwt = true
+
+[functions.create-assisted-visit]
+verify_jwt = true
+
+[functions.send-host-email]
+verify_jwt = true
+
 [db.network_restrictions]
 # Enable management of network restrictions.
 enabled = false

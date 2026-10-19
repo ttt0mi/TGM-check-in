@@ -54,12 +54,25 @@ export default {
 				throw new HttpError(400, "Host requires a department");
 
 			const service = ctx.supabaseAdmin;
-			// A completed request can be replayed safely when mobile connectivity drops.
-			const { data: existing, error: existingError } = await service
-				.from("visits")
-				.select("id")
-				.eq("submission_idempotency_key", idempotencyKey)
-				.maybeSingle();
+			const submission = {
+				p_public_slug: location,
+				p_department_id: departmentId,
+				p_staff_id: staffId,
+				p_visitor_full_name: fullName,
+				p_visitor_preferred_name: preferredName,
+				p_visitor_email: email,
+				p_phone_number: phoneNumber,
+				p_organization: organization,
+				p_visit_type: visitType,
+				p_purpose: purpose,
+				p_submission_idempotency_key: idempotencyKey,
+			};
+			// A matching completed request can be replayed without another CAPTCHA.
+			const { data: existing, error: existingError } = await service.rpc(
+				"tgm_public_visit_retry_matches", submission,
+			);
+			if (existingError?.code === "PT409")
+				throw new HttpError(409, "Idempotency key already used for a different request");
 			if (existingError) throw existingError;
 			if (existing) return json({ accepted: true }, 202);
 
@@ -119,21 +132,11 @@ export default {
 				throw new HttpError(429, "Please wait before submitting again");
 
 			const { error: createError } = await service.rpc(
-				"tgm_create_public_visit", {
-					p_public_slug: location,
-					p_department_id: departmentId,
-					p_staff_id: staffId,
-					p_visitor_full_name: fullName,
-					p_visitor_preferred_name: preferredName,
-					p_visitor_email: email,
-					p_phone_number: phoneNumber,
-					p_organization: organization,
-					p_visit_type: visitType,
-					p_purpose: purpose,
-					p_submission_idempotency_key: idempotencyKey,
-				},
+				"tgm_create_public_visit", submission,
 			);
 			if (createError) {
+				if (createError.code === "PT409")
+					throw new HttpError(409, "Idempotency key already used for a different request");
 				if (
 					createError.code === "23503" ||
 					createError.code === "23514" ||
