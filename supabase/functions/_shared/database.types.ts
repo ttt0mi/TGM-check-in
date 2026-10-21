@@ -39,87 +39,12 @@ export type Database = {
           organization_id?: string
           updated_at?: string
         }
-        Relationships: []
-      }
-      employee_hosts: {
-        Row: {
-          active: boolean
-          created_at: string
-          email: string
-          id: string
-          name: string
-          owner_id: string
-        }
-        Insert: {
-          active?: boolean
-          created_at?: string
-          email: string
-          id?: string
-          name: string
-          owner_id?: string
-        }
-        Update: {
-          active?: boolean
-          created_at?: string
-          email?: string
-          id?: string
-          name?: string
-          owner_id?: string
-        }
-        Relationships: []
-      }
-      guests: {
-        Row: {
-          checked_in_at: string | null
-          checked_out_at: string | null
-          company: string
-          created_at: string
-          email: string
-          host_id: string | null
-          host_name: string
-          host_notified_at: string | null
-          id: string
-          name: string
-          owner_id: string
-          purpose: string
-          status: string
-        }
-        Insert: {
-          checked_in_at?: string | null
-          checked_out_at?: string | null
-          company?: string
-          created_at?: string
-          email: string
-          host_id?: string | null
-          host_name: string
-          host_notified_at?: string | null
-          id?: string
-          name: string
-          owner_id?: string
-          purpose: string
-          status?: string
-        }
-        Update: {
-          checked_in_at?: string | null
-          checked_out_at?: string | null
-          company?: string
-          created_at?: string
-          email?: string
-          host_id?: string | null
-          host_name?: string
-          host_notified_at?: string | null
-          id?: string
-          name?: string
-          owner_id?: string
-          purpose?: string
-          status?: string
-        }
         Relationships: [
           {
-            foreignKeyName: "guests_host_id_fkey"
-            columns: ["host_id"]
+            foreignKeyName: "departments_organization_fk"
+            columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "employee_hosts"
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -246,34 +171,15 @@ export type Database = {
           timezone?: string
           updated_at?: string
         }
-        Relationships: []
-      }
-      organizations: {
-        Row: {
-          id: string
-          name: string
-          slug: string
-          is_active: boolean
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          name: string
-          slug: string
-          is_active?: boolean
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          name?: string
-          slug?: string
-          is_active?: boolean
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "locations_organization_fk"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       operator_profiles: {
         Row: {
@@ -299,6 +205,41 @@ export type Database = {
           role?: Database["public"]["Enums"]["tgm_operator_role"] | null
           updated_at?: string
           user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "operator_organization_fk"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organizations: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          slug?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -344,6 +285,20 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "assignment_location_organization_fk"
+            columns: ["location_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "assignment_operator_organization_fk"
+            columns: ["user_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "operator_profiles"
+            referencedColumns: ["user_id", "organization_id"]
+          },
+          {
             foreignKeyName: "receptionist_location_assignments_location_id_fkey"
             columns: ["location_id"]
             isOneToOne: false
@@ -356,54 +311,6 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "operator_profiles"
             referencedColumns: ["user_id"]
-          },
-        ]
-      }
-      self_checkout_challenges: {
-        Row: {
-          attempts: number
-          code_hash: string
-          consumed_at: string | null
-          created_at: string
-          expires_at: string
-          guest_id: string
-          id: string
-          owner_id: string
-        }
-        Insert: {
-          attempts?: number
-          code_hash: string
-          consumed_at?: string | null
-          created_at?: string
-          expires_at: string
-          guest_id: string
-          id: string
-          owner_id: string
-        }
-        Update: {
-          attempts?: number
-          code_hash?: string
-          consumed_at?: string | null
-          created_at?: string
-          expires_at?: string
-          guest_id?: string
-          id?: string
-          owner_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "self_checkout_challenges_guest_id_fkey"
-            columns: ["guest_id"]
-            isOneToOne: false
-            referencedRelation: "guests"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "self_checkout_challenges_owner_id_fkey"
-            columns: ["owner_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["owner_id"]
           },
         ]
       }
@@ -453,11 +360,25 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "staff_department_organization_fk"
+            columns: ["department_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
             foreignKeyName: "staff_location_id_fkey"
             columns: ["location_id"]
             isOneToOne: false
             referencedRelation: "locations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_location_organization_fk"
+            columns: ["location_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id", "organization_id"]
           },
         ]
       }
@@ -578,11 +499,25 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "visits_department_organization_fk"
+            columns: ["department_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
             foreignKeyName: "visits_location_id_fkey"
             columns: ["location_id"]
             isOneToOne: false
             referencedRelation: "locations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visits_location_organization_fk"
+            columns: ["location_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id", "organization_id"]
           },
           {
             foreignKeyName: "visits_staff_id_location_id_department_id_fkey"
@@ -591,156 +526,35 @@ export type Database = {
             referencedRelation: "staff"
             referencedColumns: ["id", "location_id", "department_id"]
           },
-        ]
-      }
-      workspace_reception_members: {
-        Row: {
-          created_at: string
-          owner_id: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          owner_id: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          owner_id?: string
-          user_id?: string
-        }
-        Relationships: [
           {
-            foreignKeyName: "workspace_reception_members_owner_id_fkey"
-            columns: ["owner_id"]
+            foreignKeyName: "visits_staff_tenant_location_department_fk"
+            columns: [
+              "staff_id",
+              "organization_id",
+              "location_id",
+              "department_id",
+            ]
             isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["owner_id"]
+            referencedRelation: "staff"
+            referencedColumns: [
+              "id",
+              "organization_id",
+              "location_id",
+              "department_id",
+            ]
           },
         ]
-      }
-      workspaces: {
-        Row: {
-          company_name: string
-          created_at: string
-          id: string
-          owner_id: string
-          reception_token: string
-        }
-        Insert: {
-          company_name?: string
-          created_at?: string
-          id?: string
-          owner_id: string
-          reception_token?: string
-        }
-        Update: {
-          company_name?: string
-          created_at?: string
-          id?: string
-          owner_id?: string
-          reception_token?: string
-        }
-        Relationships: []
       }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      create_self_checkout_challenge: {
-        Args: {
-          challenge_id: string
-          reception_token: string
-          verification_hash: string
-          visitor_email: string
-        }
-        Returns: {
-          created_challenge_id: string
-          send_code: boolean
-          visitor_name: string
-        }[]
-      }
-      get_my_reception_access: {
-        Args: never
-        Returns: {
-          company_name: string
-          owner_id: string
-          reception_token: string
-          role: string
-        }[]
-      }
-      get_or_create_reception_workspace: {
-        Args: never
-        Returns: {
-          company_name: string
-          reception_token: string
-        }[]
-      }
-      get_reception_company_by_qr: {
-        Args: { reception_token: string }
-        Returns: {
-          company_name: string
-        }[]
-      }
-      get_reception_hosts_by_qr: {
-        Args: { reception_token: string }
-        Returns: {
-          host_name: string
-        }[]
-      }
-      is_reception_member: {
-        Args: { workspace_owner_id: string }
-        Returns: boolean
-      }
-      list_reception_team: {
-        Args: never
-        Returns: {
-          created_at: string
-          email: string
-          user_id: string
-        }[]
-      }
-      register_visitor_by_qr: {
-        Args: {
-          reception_token: string
-          visit_purpose: string
-          visitor_company: string
-          visitor_email: string
-          visitor_host: string
-          visitor_name: string
-        }
-        Returns: {
-          checked_in_at: string
-          company: string
-          host_name: string
-          name: string
-          status: string
-        }[]
-      }
-      tgm_apply_auto_close: { Args: { p_limit?: number }; Returns: number }
-      tgm_register_organization: {
-        Args: { p_actor_id: string; p_name: string }
-        Returns: string
-      }
-      tgm_create_branch: {
-        Args: { p_actor_id: string; p_name: string; p_address: string; p_timezone: string }
-        Returns: string
-      }
-      tgm_create_operator_invitation: {
-        Args: {
-          p_actor_id: string
-          p_email: string
-          p_role: Database["public"]["Enums"]["tgm_operator_role"]
-          p_location_id: string | null
-          p_token_hash: string
-        }
-        Returns: string
-      }
       tgm_accept_operator_invitation: {
         Args: { p_actor_id: string; p_token_hash: string }
         Returns: string
       }
+      tgm_apply_auto_close: { Args: { p_limit?: number }; Returns: number }
       tgm_consume_public_rate_limit: {
         Args: {
           p_limit: number
@@ -749,15 +563,11 @@ export type Database = {
         }
         Returns: boolean
       }
-      tgm_mark_stale_host_email: {
-        Args: { p_actor_id: string; p_visit_id: string }
-        Returns: number
-      }
       tgm_create_assisted_visit: {
         Args: {
           p_actor_id: string
-          p_idempotency_key: string
           p_department_id: string
+          p_idempotency_key: string
           p_location_id: string
           p_organization: string
           p_phone_number: string
@@ -767,6 +577,25 @@ export type Database = {
           p_visitor_email: string
           p_visitor_full_name: string
           p_visitor_preferred_name: string
+        }
+        Returns: string
+      }
+      tgm_create_branch: {
+        Args: {
+          p_actor_id: string
+          p_address: string
+          p_name: string
+          p_timezone: string
+        }
+        Returns: string
+      }
+      tgm_create_operator_invitation: {
+        Args: {
+          p_actor_id: string
+          p_email: string
+          p_location_id: string
+          p_role: Database["public"]["Enums"]["tgm_operator_role"]
+          p_token_hash: string
         }
         Returns: string
       }
@@ -818,6 +647,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      tgm_mark_stale_host_email: {
+        Args: { p_actor_id: string; p_visit_id: string }
+        Returns: number
+      }
       tgm_operator_visit_action: {
         Args: {
           p_action: string
@@ -865,13 +698,29 @@ export type Database = {
         }
         Returns: string
       }
+      tgm_public_visit_retry_matches: {
+        Args: {
+          p_department_id: string
+          p_organization: string
+          p_phone_number: string
+          p_public_slug: string
+          p_purpose: string
+          p_staff_id: string
+          p_submission_idempotency_key: string
+          p_visit_type: Database["public"]["Enums"]["tgm_visit_type"]
+          p_visitor_email: string
+          p_visitor_full_name: string
+          p_visitor_preferred_name: string
+        }
+        Returns: boolean
+      }
+      tgm_register_organization: {
+        Args: { p_actor_id: string; p_name: string }
+        Returns: string
+      }
       tgm_respond_to_host: {
         Args: { p_outcome: string; p_token_hash: string }
         Returns: string
-      }
-      verify_self_checkout_code: {
-        Args: { challenge_id: string; verification_hash: string }
-        Returns: boolean
       }
     }
     Enums: {
