@@ -37,6 +37,10 @@ npx supabase login
 npx supabase link --project-ref YOUR_PROJECT_REF
 npx supabase db push
 ```
+to see what migration files supabase will push without actually pushing, run:
+```bash
+npx supabase db push --dry-run
+```
 
    Use a fresh, dedicated Supabase project. The migrations create and then
    remove tables from the earlier prototype, so review them before applying
@@ -88,10 +92,14 @@ with Supabase CLI:
 Deploy with the Supabase CLI after linking the intended project 
 and applying its migrations: 
 ```bash
-npx supabase functions deploy
+npx supabase functions deploy --project-ref YOUR-SUPABASE-PROJECT-REFERENCE --use-api --import-map supabase/functions/deno.json
 npx supabase secrets set TURNSTILE_SECRET_KEY=... TURNSTILE_ALLOWED_HOSTNAME=... HOST_DECISION_ORIGIN=... RESEND_API_KEY=... RESEND_FROM_EMAIL=...
 ```
 
+to generate supabase typescript type definitions for local development
+```bash
+npx supabase gen types typescript --project-id YOUR-SUPABASE-PROJECT-REFERENCE --schema public > PATH-TO-SUPABASE-FOLDER
+```
 Keep secrets server-side. Supabase supplies its own URL and API keys to the
 functions. See [Supabase's function secrets guide](https://supabase.com/docs/guides/functions/secrets).
 
