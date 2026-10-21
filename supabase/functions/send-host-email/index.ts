@@ -99,14 +99,16 @@ export default {
 				operator.service
 					.from("visits")
 					.select(
-						"visitor_full_name,visit_type,purpose,arrived_at,locations(timezone)",
+						"visitor_full_name,visit_type,purpose,arrived_at,location_id",
 					)
 					.eq("id", visitId)
+					.eq("organization_id", operator.organizationId)
 					.single(),
 				operator.service
 					.from("host_notification_attempts")
 					.select("recipient_email")
 					.eq("id", attemptId)
+					.eq("visit_id", visitId)
 					.single(),
 			]);
 			if (
@@ -122,7 +124,15 @@ export default {
 				);
 			}
 			const visit = visitResult.data;
-			const location = visit.locations as unknown as { timezone: string };
+			const { data: location, error: locationError } = await operator.service
+				.from("locations")
+				.select("timezone")
+				.eq("id", visit.location_id)
+				.eq("organization_id", operator.organizationId)
+				.single();
+			if (locationError || !location) {
+				throw locationError || new Error("Prepared visit branch unavailable");
+			}
 			const arrival = new Intl.DateTimeFormat("en-NG", {
 				timeZone: location.timezone,
 				dateStyle: "medium",
