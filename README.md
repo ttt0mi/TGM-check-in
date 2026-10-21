@@ -43,30 +43,30 @@ npx supabase db push
    them to a database containing anything you need to keep. If migrations have
    already been applied, use `db push` to apply the remaining migrations;
    don't reset the database.
-4. Create the first admin using the steps below.
+4. Register the first customer organization using the steps below.
 
-### Create the first admin
+### Register a customer organization
 
-Complete the migrations and enable email confirmation before following these
-steps. This setup is for one initial admin and does not require SQL.
+After email confirmation, an unassigned user can call the authenticated
+`register-organization` Edge Function with `{ "name": "Company name" }`.
+The database atomically creates the organization and makes that user its first
+customer admin. This endpoint is disabled until the server-only
+`TGM_ENABLE_ORGANIZATION_SIGNUP=true` flag is set. Leave it disabled until the
+tenant migration and Edge Functions have passed the rollout checks in
+[the tenancy runbook](docs/tenancy-foundation.md).
 
-1. In Supabase, go to **Authentication → Users**, choose **Add user**, and
-   send an invitation to the email address of the person who will be admin.
-2. Have that person open the invitation and verify their email. Check that the
-   user's email is confirmed in the dashboard, then copy their user ID. Make
-   sure your Supabase Auth site URL is configured for the invitation redirect.
-3. Open **Table Editor → operator_profiles**. Find the row whose `user_id`
-   matches that user ID. If the row is missing, stop and check that all
-   migrations and the account-creation trigger are in place.
-4. Confirm there is no active admin already. Edit the matching row and save
-   `role` as `admin` and `is_active` as `true` together.
+Customer admins can create branches with `create-branch`, create a seven-day
+operator invitation with `invite-operator`, and assign or deactivate existing
+members with `manage-operator`. `invite-operator` returns a one-time token for
+later delivery by the frontend; it does not send email in this backend phase.
+A signed-in user with the invited, verified email accepts it with
+`accept-operator-invite`. An account cannot join a second organization.
 
-Only a trusted project owner should have dashboard access to perform this
-setup. Subsequent operators are managed by an active admin. An operator's live
-profile controls application access; deactivation does not ban their Supabase
-Auth sign-in. The replacement portal and its invitation/password setup are
-not implemented yet, so provisioning an admin does not make the current
-prototype a working admin portal.
+Platform administrators are separate from customer admins. A trusted database
+owner provisions one manually in `tgm_private.platform_administrators` after
+verifying the account. This does not grant access to customer visit data.
+The replacement signup and invitation UI is not implemented yet; the current
+prototype UI still uses the removed `guests` model.
 
 ### create resend account
 Create a Resend account, verify a sender domain/address, and set `RESEND_API_KEY` and `RESEND_FROM_EMAIL` in the server environment. Do not prefix these values with `NEXT_PUBLIC_`.
