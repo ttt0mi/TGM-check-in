@@ -20,6 +20,7 @@ export type Database = {
           id: string
           is_active: boolean
           name: string
+          organization_id: string
           updated_at: string
         }
         Insert: {
@@ -27,6 +28,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           name: string
+          organization_id: string
           updated_at?: string
         }
         Update: {
@@ -34,6 +36,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           name?: string
+          organization_id?: string
           updated_at?: string
         }
         Relationships: []
@@ -212,6 +215,7 @@ export type Database = {
           id: string
           is_active: boolean
           name: string
+          organization_id: string
           public_slug: string
           timezone: string
           updated_at: string
@@ -224,6 +228,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           name: string
+          organization_id: string
           public_slug?: string
           timezone?: string
           updated_at?: string
@@ -236,8 +241,36 @@ export type Database = {
           id?: string
           is_active?: boolean
           name?: string
+          organization_id?: string
           public_slug?: string
           timezone?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      organizations: {
+        Row: {
+          id: string
+          name: string
+          slug: string
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          slug: string
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          slug?: string
+          is_active?: boolean
+          created_at?: string
           updated_at?: string
         }
         Relationships: []
@@ -246,6 +279,7 @@ export type Database = {
         Row: {
           created_at: string
           is_active: boolean
+          organization_id: string | null
           role: Database["public"]["Enums"]["tgm_operator_role"] | null
           updated_at: string
           user_id: string
@@ -253,6 +287,7 @@ export type Database = {
         Insert: {
           created_at?: string
           is_active?: boolean
+          organization_id?: string | null
           role?: Database["public"]["Enums"]["tgm_operator_role"] | null
           updated_at?: string
           user_id: string
@@ -260,6 +295,7 @@ export type Database = {
         Update: {
           created_at?: string
           is_active?: boolean
+          organization_id?: string | null
           role?: Database["public"]["Enums"]["tgm_operator_role"] | null
           updated_at?: string
           user_id?: string
@@ -288,18 +324,21 @@ export type Database = {
         Row: {
           created_at: string
           location_id: string
+          organization_id: string
           updated_at: string
           user_id: string
         }
         Insert: {
           created_at?: string
           location_id: string
+          organization_id: string
           updated_at?: string
           user_id: string
         }
         Update: {
           created_at?: string
           location_id?: string
+          organization_id?: string
           updated_at?: string
           user_id?: string
         }
@@ -377,6 +416,7 @@ export type Database = {
           id: string
           is_active: boolean
           location_id: string
+          organization_id: string
           preferred_name: string | null
           updated_at: string
         }
@@ -388,6 +428,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           location_id: string
+          organization_id: string
           preferred_name?: string | null
           updated_at?: string
         }
@@ -399,6 +440,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           location_id?: string
+          organization_id?: string
           preferred_name?: string | null
           updated_at?: string
         }
@@ -465,6 +507,7 @@ export type Database = {
           id: string
           location_id: string
           organization: string | null
+          organization_id: string
           phone_number: string
           purpose: string
           reception_reviewed_at: string | null
@@ -488,6 +531,7 @@ export type Database = {
           id?: string
           location_id: string
           organization?: string | null
+          organization_id: string
           phone_number: string
           purpose: string
           reception_reviewed_at?: string | null
@@ -511,6 +555,7 @@ export type Database = {
           id?: string
           location_id?: string
           organization?: string | null
+          organization_id?: string
           phone_number?: string
           purpose?: string
           reception_reviewed_at?: string | null
@@ -674,6 +719,28 @@ export type Database = {
         }[]
       }
       tgm_apply_auto_close: { Args: { p_limit?: number }; Returns: number }
+      tgm_register_organization: {
+        Args: { p_actor_id: string; p_name: string }
+        Returns: string
+      }
+      tgm_create_branch: {
+        Args: { p_actor_id: string; p_name: string; p_address: string; p_timezone: string }
+        Returns: string
+      }
+      tgm_create_operator_invitation: {
+        Args: {
+          p_actor_id: string
+          p_email: string
+          p_role: Database["public"]["Enums"]["tgm_operator_role"]
+          p_location_id: string | null
+          p_token_hash: string
+        }
+        Returns: string
+      }
+      tgm_accept_operator_invitation: {
+        Args: { p_actor_id: string; p_token_hash: string }
+        Returns: string
+      }
       tgm_consume_public_rate_limit: {
         Args: {
           p_limit: number
@@ -739,6 +806,7 @@ export type Database = {
         Returns: {
           created_at: string
           is_active: boolean
+          organization_id: string | null
           role: Database["public"]["Enums"]["tgm_operator_role"] | null
           updated_at: string
           user_id: string
@@ -767,6 +835,7 @@ export type Database = {
           id: string
           location_id: string
           organization: string | null
+          organization_id: string
           phone_number: string
           purpose: string
           reception_reviewed_at: string | null

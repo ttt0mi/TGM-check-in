@@ -97,6 +97,18 @@ verify_jwt = true
 [functions.send-host-email]
 verify_jwt = true
 
+[functions.register-organization]
+verify_jwt = true
+
+[functions.create-branch]
+verify_jwt = true
+
+[functions.invite-operator]
+verify_jwt = true
+
+[functions.accept-operator-invite]
+verify_jwt = true
+
 [db.network_restrictions]
 # Enable management of network restrictions.
 enabled = false
