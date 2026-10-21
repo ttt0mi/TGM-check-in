@@ -67,6 +67,22 @@ export default {
 				p_purpose: purpose,
 				p_submission_idempotency_key: idempotencyKey,
 			};
+			const { data: activeLocation, error: locationError } = await service
+				.from("locations")
+				.select("id,organization_id")
+				.eq("public_slug", location)
+				.eq("is_active", true)
+				.maybeSingle();
+			if (locationError) throw locationError;
+			if (!activeLocation) throw new HttpError(400, "Location unavailable");
+			const { data: activeOrganization, error: organizationError } = await service
+				.from("organizations")
+				.select("id")
+				.eq("id", activeLocation.organization_id)
+				.eq("is_active", true)
+				.maybeSingle();
+			if (organizationError) throw organizationError;
+			if (!activeOrganization) throw new HttpError(400, "Location unavailable");
 			// A matching completed request can be replayed without another CAPTCHA.
 			const { data: existing, error: existingError } = await service.rpc(
 				"tgm_public_visit_retry_matches", submission,
@@ -106,14 +122,6 @@ export default {
 			}
 
 			// Do not create rate-limit rows for invalid tokens or arbitrary QR values.
-			const { data: activeLocation, error: locationError } = await service
-				.from("locations")
-				.select("id")
-				.eq("public_slug", location)
-				.eq("is_active", true)
-				.maybeSingle();
-			if (locationError) throw locationError;
-			if (!activeLocation) throw new HttpError(400, "Location unavailable");
 			const timeWindow = new Date(
 				Math.floor(Date.now() / 300_000) * 300_000,
 			).toISOString();
