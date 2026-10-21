@@ -27,7 +27,7 @@ export default {
 			const body = await readJson(req);
 			const idempotencyKey = uuid(body.idempotency_key, "idempotency key");
 			const locationId = uuid(body.location_id, "location");
-			requireLocationAccess(operator, locationId);
+			await requireLocationAccess(operator, locationId);
 			const departmentId =
 				body.department_id == null
 					? null
