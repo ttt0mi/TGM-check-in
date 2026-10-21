@@ -15,23 +15,33 @@ export default {
 			const service = ctx.supabaseAdmin;
 			const { data: location, error: locationError } = await service
 				.from("locations")
-				.select("id,name,address,timezone")
+				.select("id,organization_id,name,address,timezone")
 				.eq("public_slug", slug)
 				.eq("is_active", true)
 				.maybeSingle();
 			if (locationError) throw locationError;
 			if (!location) return json({ error: "Location unavailable" }, 404);
+			const { data: organization, error: organizationError } = await service
+				.from("organizations")
+				.select("id")
+				.eq("id", location.organization_id)
+				.eq("is_active", true)
+				.maybeSingle();
+			if (organizationError) throw organizationError;
+			if (!organization) return json({ error: "Location unavailable" }, 404);
 
 			const [departmentsResult, staffResult] = await Promise.all([
 				service
 					.from("departments")
 					.select("id,name")
+					.eq("organization_id", location.organization_id)
 					.eq("is_active", true)
 					.order("name"),
 				service
 					.from("staff")
 					.select("id,department_id,full_name,preferred_name")
 					.eq("location_id", location.id)
+					.eq("organization_id", location.organization_id)
 					.eq("is_active", true)
 					.order("full_name"),
 			]);
