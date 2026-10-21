@@ -112,23 +112,38 @@ export async function authenticatedOperator(ctx: SupabaseContext<Database>) {
 	const service = ctx.supabaseAdmin;
 	const { data: profile, error: profileError } = await service
 		.from("operator_profiles")
-		.select("role,is_active")
+		.select("role,is_active,organization_id")
 		.eq("user_id", userId)
 		.single();
-	if (profileError || !profile?.is_active || !profile.role)
+	if (profileError || !profile?.is_active || !profile.role || !profile.organization_id)
 		throw new HttpError(403, "Operator access is inactive");
+	const { data: organization, error: organizationError } = await service
+		.from("organizations")
+		.select("id")
+		.eq("id", profile.organization_id)
+		.eq("is_active", true)
+		.maybeSingle();
+	if (organizationError || !organization)
+		throw new HttpError(403, "Organization access is inactive");
 	let locationId: string | null = null;
 	if (profile.role === "receptionist") {
 		const { data: assignment, error } = await service
 			.from("receptionist_location_assignments")
-			.select("location_id,locations!inner(is_active)")
+			.select("location_id")
 			.eq("user_id", userId)
+			.eq("organization_id", profile.organization_id)
 			.single();
-		if (
-			error ||
-			!assignment?.location_id ||
-			!(assignment.locations as { is_active: boolean }).is_active
-		) {
+		if (error || !assignment?.location_id) {
+			throw new HttpError(403, "No active location assignment");
+		}
+		const { data: location, error: locationError } = await service
+			.from("locations")
+			.select("id")
+			.eq("id", assignment.location_id)
+			.eq("organization_id", profile.organization_id)
+			.eq("is_active", true)
+			.maybeSingle();
+		if (locationError || !location) {
 			throw new HttpError(403, "No active location assignment");
 		}
 		locationId = assignment.location_id;
@@ -136,16 +151,32 @@ export async function authenticatedOperator(ctx: SupabaseContext<Database>) {
 	return {
 		service,
 		userId,
+		organizationId: profile.organization_id,
 		role: profile.role as "admin" | "receptionist",
 		locationId,
 	};
 }
 
-export function requireLocationAccess(
-	operator: { role: string; locationId: string | null },
+export async function requireLocationAccess(
+	operator: {
+        service: SupabaseContext<Database>["supabaseAdmin"];
+        organizationId: string;
+        role: string;
+        locationId: string | null
+    },
 	locationId: string,
-) {
+): Promise<void> {
 	if (operator.role !== "admin" && operator.locationId !== locationId) {
+		throw new HttpError(403, "Location access denied");
+	}
+	const { data: location, error } = await operator.service
+		.from("locations")
+		.select("id")
+		.eq("id", locationId)
+		.eq("organization_id", operator.organizationId)
+		.eq("is_active", true)
+		.maybeSingle();
+	if (error || !location) {
 		throw new HttpError(403, "Location access denied");
 	}
 }
