@@ -71,9 +71,9 @@ enabled = false
 # Supports glob patterns relative to supabase directory: "./seeds/*.sql"
 sql_paths = ["./seed.sql"]
 
-# These endpoints authenticate requests using Turnstile or a one-time host
-# decision token, or expose only the public directory. They must be reachable
-# without a user JWT.
+# These endpoints authenticate requests using Turnstile, one-time host or
+# temporary visitor tokens, or expose only the public directory. They must be
+# reachable without a user JWT.
 [functions.get-public-directory]
 verify_jwt = false
 
@@ -81,6 +81,9 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.respond-to-host-visit]
+verify_jwt = false
+
+[functions.get-visitor-visit]
 verify_jwt = false
 
 # Operator functions require a signed-in user at the gateway as well as the

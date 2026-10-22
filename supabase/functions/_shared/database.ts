@@ -4,6 +4,21 @@ export type { Json };
 
 type Functions = GeneratedDatabase["public"]["Functions"];
 
+type PublicVisitArgs = {
+	p_department_id: string | null;
+	p_organization: string | null;
+	p_phone_number: string;
+	p_public_slug: string;
+	p_purpose: string;
+	p_staff_id: string | null;
+	p_submission_idempotency_key: string;
+	p_visit_type: GeneratedDatabase["public"]["Enums"]["tgm_visit_type"];
+	p_visitor_email: string | null;
+	p_visitor_full_name: string;
+	p_visitor_preferred_name: string | null;
+	p_visitor_session_token_hash: string | null;
+};
+
 type WithArgs<
 	FunctionName extends keyof Functions,
 	Args extends object,
@@ -18,7 +33,10 @@ export type Database = Omit<GeneratedDatabase, "public"> & {
 	public: Omit<GeneratedDatabase["public"], "Functions"> & {
 		Functions: Omit<
 			Functions,
-			"tgm_create_assisted_visit" | "tgm_create_public_visit"
+			| "tgm_create_assisted_visit"
+			| "tgm_create_operator_invitation"
+			| "tgm_create_public_visit"
+			| "tgm_public_visit_retry_matches"
 		> & {
 			tgm_create_assisted_visit: WithArgs<
 				"tgm_create_assisted_visit",
@@ -30,27 +48,16 @@ export type Database = Omit<GeneratedDatabase, "public"> & {
 					p_visitor_preferred_name: string | null;
 				}
 			>;
-			tgm_create_public_visit: WithArgs<
-				"tgm_create_public_visit",
-				{
-					p_department_id: string | null;
-					p_organization: string | null;
-					p_staff_id: string | null;
-					p_visitor_email: string | null;
-					p_visitor_preferred_name: string | null;
-				}
+			tgm_create_operator_invitation: WithArgs<
+				"tgm_create_operator_invitation",
+				{ p_location_id: string | null }
 			>;
+			tgm_create_public_visit: {
+				Args: PublicVisitArgs;
+				Returns: string;
+			};
 			tgm_public_visit_retry_matches: {
-				Args: WithArgs<
-					"tgm_create_public_visit",
-					{
-						p_department_id: string | null;
-						p_organization: string | null;
-						p_staff_id: string | null;
-						p_visitor_email: string | null;
-						p_visitor_preferred_name: string | null;
-					}
-				>["Args"];
+				Args: PublicVisitArgs;
 				Returns: boolean;
 			};
 		};
