@@ -21,6 +21,21 @@ insert into public.locations (id, organization_id, name, timezone) values
   ('bc000000-0000-4000-8000-000000000001',
     'bb000000-0000-4000-8000-000000000001', 'Other Branch', 'Africa/Lagos');
 
+insert into public.departments (id, organization_id, name) values (
+  'aa100000-0000-4000-8000-000000000001',
+  'aa000000-0000-4000-8000-000000000001',
+  'Lifecycle Department'
+);
+insert into public.staff (
+  id, organization_id, location_id, department_id, full_name, preferred_name, email
+) values (
+  'aa200000-0000-4000-8000-000000000001',
+  'aa000000-0000-4000-8000-000000000001',
+  'ac000000-0000-4000-8000-000000000001',
+  'aa100000-0000-4000-8000-000000000001',
+  'Lifecycle Host', 'Host', 'lifecycle-host@test.example'
+);
+
 update public.operator_profiles
 set organization_id = 'aa000000-0000-4000-8000-000000000001', role = 'admin', is_active = true
 where user_id = 'ca000000-0000-4000-8000-000000000001';
@@ -97,9 +112,37 @@ begin
     or visit_row.checkout_location_id <> visit_row.location_id then
     raise exception 'Reception checkout provenance is incorrect';
   end if;
-  if exists (select 1 from public.tgm_get_visitor_visit(session_hash)) then
-    raise exception 'Terminal visit did not revoke its visitor session';
-  end if;
+  if not exists (
+    select 1 from public.tgm_get_visitor_visit(session_hash)
+    where status = 'checked_out' and time_out is not null
+      and not self_checkout_available
+  ) then raise exception 'Checked-out visit was not readable for the session lifetime'; end if;
+
+  begin
+    perform public.tgm_public_visit_retry_matches(
+      (select public_slug from public.locations where id = 'ac000000-0000-4000-8000-000000000001'),
+      null, null, 'Duplicate Session Visitor', null, null, '+2348012345688', null,
+      'business', 'Session reuse test', 'ad000000-0000-4000-8000-000000000088', session_hash
+    );
+    raise exception 'Retry check allowed a token bound to another visit';
+  exception when sqlstate 'PT409' then
+    if sqlerrm <> 'Visitor session already has a visit' then raise; end if;
+  end;
+
+  begin
+    perform public.tgm_create_public_visit(
+      (select public_slug from public.locations where id = 'ac000000-0000-4000-8000-000000000001'),
+      null, null, 'Duplicate Session Visitor', null, null, '+2348012345688', null,
+      'business', 'Session reuse test', 'ad000000-0000-4000-8000-000000000088', session_hash
+    );
+    raise exception 'A visitor session was attached to a second visit';
+  exception when sqlstate 'PT409' then
+    if sqlerrm <> 'Visitor session already has a visit' then raise; end if;
+  end;
+  if exists (
+    select 1 from public.visits
+    where submission_idempotency_key = 'ad000000-0000-4000-8000-000000000088'
+  ) then raise exception 'Rejected session reuse left a visit behind'; end if;
   if not exists (
     select 1 from public.visit_events where visit_id = visit_id_value
       and event_type = 'checked_out'
@@ -158,6 +201,70 @@ begin
   exception when raise_exception then
     if sqlerrm <> 'Visit branch cannot be changed' then raise; end if;
   end;
+end;
+$$;
+
+do $$
+declare declined_visit_id uuid;
+declare cancelled_visit_id uuid;
+declare auto_closed_visit_id uuid;
+declare declined_hash bytea := decode(repeat('44', 32), 'hex');
+declare cancelled_hash bytea := decode(repeat('55', 32), 'hex');
+declare auto_closed_hash bytea := decode(repeat('66', 32), 'hex');
+declare host_token_hash bytea := decode(repeat('77', 32), 'hex');
+begin
+  declined_visit_id := public.tgm_create_public_visit(
+    (select public_slug from public.locations where id = 'ac000000-0000-4000-8000-000000000001'),
+    'aa100000-0000-4000-8000-000000000001',
+    'aa200000-0000-4000-8000-000000000001',
+    'Declined Visitor', null, null, '+2348012345683', null,
+    'business', 'Declined session test', 'ad000000-0000-4000-8000-000000000004', declined_hash
+  );
+  perform public.tgm_operator_visit_action(
+    'ca000000-0000-4000-8000-000000000002', declined_visit_id, 'review', '{}'::jsonb
+  );
+  insert into public.host_decision_tokens (visit_id, token_hash, expires_at)
+    values (declined_visit_id, host_token_hash, now() + interval '1 hour');
+  if public.tgm_respond_to_host(host_token_hash, 'declined') <> 'declined' then
+    raise exception 'Host decline did not complete';
+  end if;
+  if not exists (
+    select 1 from public.tgm_get_visitor_visit(declined_hash)
+    where status = 'declined' and not self_checkout_available
+  ) then raise exception 'Declined visit session did not remain readable'; end if;
+
+  cancelled_visit_id := public.tgm_create_public_visit(
+    (select public_slug from public.locations where id = 'ac000000-0000-4000-8000-000000000001'),
+    null, null, 'Cancelled Visitor', null, null, '+2348012345684', null,
+    'business', 'Cancelled session test', 'ad000000-0000-4000-8000-000000000005', cancelled_hash
+  );
+  perform public.tgm_operator_visit_action(
+    'ca000000-0000-4000-8000-000000000002', cancelled_visit_id, 'cancel', '{}'::jsonb
+  );
+  if not exists (
+    select 1 from public.tgm_get_visitor_visit(cancelled_hash)
+    where status = 'cancelled' and not self_checkout_available
+  ) then raise exception 'Cancelled visit session did not remain readable'; end if;
+
+  auto_closed_visit_id := public.tgm_create_public_visit(
+    (select public_slug from public.locations where id = 'ac000000-0000-4000-8000-000000000001'),
+    null, null, 'Auto-closed QR Visitor', null, null, '+2348012345685', null,
+    'business', 'Auto-closed session test', 'ad000000-0000-4000-8000-000000000006', auto_closed_hash
+  );
+  perform public.tgm_operator_visit_action(
+    'ca000000-0000-4000-8000-000000000002', auto_closed_visit_id, 'admit', '{}'::jsonb
+  );
+  update public.visits
+    set arrived_at = now() - interval '2 days', admitted_at = now() - interval '2 days'
+    where id = auto_closed_visit_id;
+  update public.locations set auto_close_enabled = true, auto_close_local_time = '00:00'
+    where id = 'ac000000-0000-4000-8000-000000000001';
+  perform public.tgm_apply_auto_close(200);
+  if not exists (
+    select 1 from public.tgm_get_visitor_visit(auto_closed_hash)
+    where status = 'auto_closed' and time_out is not null
+      and not self_checkout_available
+  ) then raise exception 'Auto-closed visit session did not remain readable'; end if;
 end;
 $$;
 
@@ -282,6 +389,16 @@ begin
   if exists (select 1 from tgm_private.visitor_sessions where visit_id = visit_id_value) then
     raise exception 'Expired visitor session was not purged';
   end if;
+  begin
+    perform public.tgm_create_public_visit(
+      (select public_slug from public.locations where id = 'ac000000-0000-4000-8000-000000000001'),
+      null, null, 'Reused Expired Session', null, null, '+2348012345682', null,
+      'business', 'Expired token reuse test', 'ad000000-0000-4000-8000-000000000003', expired_hash
+    );
+    raise exception 'An expired visitor token was attached to another visit';
+  exception when sqlstate 'PT409' then
+    if sqlerrm <> 'Visitor session already has a visit' then raise; end if;
+  end;
 end;
 $$;
 
