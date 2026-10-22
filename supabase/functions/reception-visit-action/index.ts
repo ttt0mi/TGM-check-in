@@ -44,9 +44,7 @@ export default {
 			);
 			if (error) {
 				if (
-					error.code === "P0001" ||
-					error.code === "23514" ||
-					error.code === "23503" ||
+                    ["P0001", "23514", "23503"].includes(error.code) ||
 					error.code?.startsWith("22")
 				) {
 					throw new HttpError(400, error.message);

@@ -32,7 +32,7 @@ export default {
 				p_token_hash: `\\x${hash}`,
 			});
 			if (error) {
-				if (error.code === "P0001" || error.code === "23514" || error.code === "23503")
+				if (["P0001", "23514", "23503"].includes(error.code))
 					throw new HttpError(400, error.message);
 				throw error;
 			}
