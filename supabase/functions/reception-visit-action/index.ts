@@ -11,7 +11,14 @@ import type { Database } from "../_shared/database.ts";
 import type { JsonObject } from "../_shared/tgm.ts";
 
 
-const actions = new Set(["edit", "review", "admit", "checkout", "cancel"]);
+const actions = new Set([
+	"edit",
+	"review",
+	"admit",
+	"checkout",
+	"correct_checkout",
+	"cancel",
+]);
 
 export default {
 	fetch: withSupabase<Database>({ auth: "user" }, async (req, ctx) => {
@@ -40,7 +47,7 @@ export default {
 					error.code === "P0001" ||
 					error.code === "23514" ||
 					error.code === "23503" ||
-					error.code === "22P02"
+					error.code?.startsWith("22")
 				) {
 					throw new HttpError(400, error.message);
 				}
