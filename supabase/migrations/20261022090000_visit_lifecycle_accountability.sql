@@ -196,18 +196,6 @@ create index visitor_sessions_location_organization_idx
   on tgm_private.visitor_sessions (location_id, organization_id);
 revoke all on tgm_private.visitor_sessions from public, anon, authenticated, service_role;
 
--- Cover private foreign keys that were introduced by earlier hardening and
--- tenancy migrations. This branch is deployable without the separate cleanup
--- branch where these indexes were first identified.
-create index assisted_submission_keys_actor_id_idx
-  on tgm_private.assisted_submission_keys (actor_id);
-create index operator_invitations_invited_by_idx
-  on tgm_private.operator_invitations (invited_by);
-create index operator_invitations_accepted_by_idx
-  on tgm_private.operator_invitations (accepted_by);
-create index operator_invitations_location_organization_idx
-  on tgm_private.operator_invitations (location_id, organization_id);
-
 alter table tgm_private.public_submission_keys
   add column visitor_session_token_hash bytea
     check (visitor_session_token_hash is null or octet_length(visitor_session_token_hash) = 32);
