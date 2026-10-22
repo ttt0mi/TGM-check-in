@@ -4,3 +4,8 @@
 - The `__InternalSupabase` block and the lack of quotes/semicolons are intentional and match the modern `@supabase/supabase-js` schema.
 - If you need to use these types in a component, extract them cleanly without changing the source file:
   type Department = Database['public']['Tables']['departments']['Row'];
+
+### Supabase Migration Rule
+* **Never edit existing migration files:** Do not modify any SQL files inside the `supabase/migrations/` directory that have already been created.
+* **Always create new migrations:** When making schema changes, always generate a brand-new migration file.
+* **Use exact current timestamps:** Name new migration files using the current precise UTC timestamp in the format `YYYYMMDDHHMMSS_description.sql` (e.g., `20261022095500_add_users_table.sql`). Never reuse or increment an old timestamp.

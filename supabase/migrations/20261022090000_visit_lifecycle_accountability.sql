@@ -194,14 +194,20 @@ create table tgm_private.visitor_sessions (
   location_id uuid not null,
   issued_at timestamptz not null default now(),
   expires_at timestamptz not null default (now() + interval '24 hours'),
+  revoked_at timestamptz,
   foreign key (visit_id, organization_id)
     references public.visits(id, organization_id) on delete cascade,
   foreign key (location_id, organization_id)
     references public.locations(id, organization_id) on delete restrict,
-  check (expires_at > issued_at)
+  check (expires_at > issued_at),
+  check (revoked_at is null or revoked_at >= issued_at)
 );
 create index visitor_sessions_expiry_idx
-  on tgm_private.visitor_sessions (expires_at);
+  on tgm_private.visitor_sessions (expires_at)
+  where revoked_at is null;
+create index visitor_sessions_revoked_idx
+  on tgm_private.visitor_sessions (revoked_at)
+  where revoked_at is not null;
 create index visitor_sessions_visit_organization_idx
   on tgm_private.visitor_sessions (visit_id, organization_id);
 create index visitor_sessions_location_organization_idx
@@ -211,9 +217,22 @@ revoke all on tgm_private.visitor_sessions from public, anon, authenticated, ser
 alter table tgm_private.public_submission_keys
   add column visitor_session_token_hash bytea
     check (visitor_session_token_hash is null or octet_length(visitor_session_token_hash) = 32);
-create unique index public_submission_keys_visitor_session_token_hash_key
-  on tgm_private.public_submission_keys (visitor_session_token_hash)
-  where visitor_session_token_hash is not null;
+
+create function tgm_private.revoke_terminal_visitor_session()
+returns trigger language plpgsql set search_path = '' as $$
+begin
+  if new.status in ('declined', 'cancelled', 'checked_out', 'auto_closed')
+    and old.status is distinct from new.status then
+    update tgm_private.visitor_sessions
+      set revoked_at = coalesce(revoked_at, now())
+      where visit_id = new.id;
+  end if;
+  return new;
+end;
+$$;
+create trigger visits_revoke_terminal_session
+  after update of status on public.visits
+  for each row execute function tgm_private.revoke_terminal_visitor_session();
 
 create or replace function public.tgm_operator_visit_action(
   p_actor_id uuid, p_visit_id uuid, p_action text, p_patch jsonb default '{}'::jsonb
@@ -460,15 +479,7 @@ begin
     into existing_hash, existing_visit_id, existing_session_hash
   from tgm_private.public_submission_keys k
   where k.idempotency_key = p_submission_idempotency_key;
-  if not found then
-    if p_visitor_session_token_hash is not null and exists (
-      select 1 from tgm_private.public_submission_keys k
-      where k.visitor_session_token_hash = p_visitor_session_token_hash
-    ) then
-      raise sqlstate 'PT409' using message = 'Visitor session already has a visit';
-    end if;
-    return false;
-  end if;
+  if not found then return false; end if;
   if existing_hash <> tgm_private.public_submission_hash(
     p_public_slug, p_department_id, p_staff_id, p_visitor_full_name,
     p_visitor_preferred_name, p_visitor_email, p_phone_number, p_organization,
@@ -541,12 +552,6 @@ begin
       where k.idempotency_key = p_submission_idempotency_key;
     return visit_id_value;
   end if;
-  if p_visitor_session_token_hash is not null and exists (
-    select 1 from tgm_private.public_submission_keys k
-    where k.visitor_session_token_hash = p_visitor_session_token_hash
-  ) then
-    raise sqlstate 'PT409' using message = 'Visitor session already has a visit';
-  end if;
   select l.id, l.organization_id into location_id_value, tenant_id from public.locations l
     join public.organizations o on o.id = l.organization_id and o.is_active
     where l.public_slug = p_public_slug and l.is_active;
@@ -561,28 +566,18 @@ begin
     btrim(p_phone_number), nullif(btrim(p_organization), ''), p_visit_type,
     btrim(p_purpose), 'qr', p_submission_idempotency_key
   ) returning id into visit_id_value;
-  begin
-    insert into tgm_private.public_submission_keys
-      (idempotency_key, visit_id, request_hash, visitor_session_token_hash)
-    values (
-      p_submission_idempotency_key,
-      visit_id_value,
-      tgm_private.public_submission_hash(
-        p_public_slug, p_department_id, p_staff_id, p_visitor_full_name,
-        p_visitor_preferred_name, p_visitor_email, p_phone_number, p_organization,
-        p_visit_type, p_purpose
-      ),
-      p_visitor_session_token_hash
-    );
-  exception when unique_violation then
-    if p_visitor_session_token_hash is not null and exists (
-      select 1 from tgm_private.public_submission_keys k
-      where k.visitor_session_token_hash = p_visitor_session_token_hash
-    ) then
-      raise sqlstate 'PT409' using message = 'Visitor session already has a visit';
-    end if;
-    raise;
-  end;
+  insert into tgm_private.public_submission_keys
+    (idempotency_key, visit_id, request_hash, visitor_session_token_hash)
+  values (
+    p_submission_idempotency_key,
+    visit_id_value,
+    tgm_private.public_submission_hash(
+      p_public_slug, p_department_id, p_staff_id, p_visitor_full_name,
+      p_visitor_preferred_name, p_visitor_email, p_phone_number, p_organization,
+      p_visit_type, p_purpose
+    ),
+    p_visitor_session_token_hash
+  );
   if p_visitor_session_token_hash is not null then
     insert into tgm_private.visitor_sessions
       (token_hash, visit_id, organization_id, location_id)
@@ -650,6 +645,7 @@ returns table (
     and s.department_id = v.department_id
   where vs.token_hash = p_token_hash
     and octet_length(p_token_hash) = 32
+    and vs.revoked_at is null
     and vs.expires_at > now()
   limit 1;
 $$;
@@ -662,7 +658,8 @@ declare removed_count integer;
 begin
   if current_user <> 'postgres' then raise exception 'Database owner only'; end if;
   delete from tgm_private.visitor_sessions
-  where expires_at <= now();
+  where expires_at <= now()
+    or (revoked_at is not null and revoked_at < now() - interval '1 day');
   get diagnostics removed_count = row_count;
   return removed_count;
 end;
