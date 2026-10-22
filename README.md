@@ -123,6 +123,12 @@ key. Reusing a key with different details returns HTTP 409 rather than accepting
 the wrong visit. A completed retry does not need a new Turnstile token. Keys are
 retained for the lifetime of their visit.
 
+The replacement visitor frontend can also create a temporary, 24-hour QR
+visitor session for status polling. Checkout provenance, administrative
+corrections, token requirements, and the public status endpoint are documented
+in [the lifecycle contract](docs/visit-lifecycle-accountability.md). Actual
+self checkout remains disabled until the geofence and face-verification phase.
+
 
 ## Local development
 
