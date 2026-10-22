@@ -34,7 +34,20 @@ visit preserves its original checkout method and appends a
 branch, organization, and reason. Correcting an active on-site visit closes it
 with the `admin_correction` method. Corrections never reopen visits.
 
-## QR visitor sessions
+## Visitor status sessions for QR check-ins
+
+The QR code only opens the public check-in page for a branch. It is not the
+visitor session and does not contain the session secret. When the visitor
+submits that page, the future frontend can create a random secret and send it
+with the form. The database links a one-way hash of that secret to the newly
+created visit.
+
+While the visit remains active, that browser can present the secret to ask for
+the current visit status without requiring the visitor to create an account.
+The response is deliberately limited to the visitor's display name, the
+organization and branch names, the host's display name, and relevant visit
+times. The secret does not grant operator access, expose contact details,
+verify the visitor's identity or location, or enable self checkout.
 
 The replacement frontend may add `visitor_session_token` to the existing
 `submit-public-visit` request. It must be a cryptographically random 32-byte
@@ -59,12 +72,14 @@ organization and branch names, admission and departure times, and
 `self_checkout_available: false`. It does not expose visitor contact details,
 internal IDs, or token hashes.
 
-Credentials expire after 24 hours and are revoked when a visit is declined,
-cancelled, checked out, auto-closed, or administratively closed. Expired,
-revoked, malformed, and unknown credentials all return a generic unavailable
-response. Store the token in tab-scoped session storage in the later frontend,
-never in a URL or persistent shared-tablet storage, and clear it when the
-visitor finishes using a shared device.
+The 24-hour lifetime begins when the check-in is created. The credential is
+revoked sooner when the visit is declined, cancelled, checked out, auto-closed,
+or administratively closed. After revocation, the endpoint returns a generic
+unavailable response instead of the terminal status. Expired, malformed, and
+unknown credentials return the same response. Store the token in tab-scoped
+session storage in the later frontend, never in a URL or persistent
+shared-tablet storage, and clear it when the visitor finishes using a shared
+device.
 
 ## Maintenance and rollout
 
