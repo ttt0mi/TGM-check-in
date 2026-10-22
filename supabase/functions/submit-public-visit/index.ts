@@ -52,6 +52,16 @@ export default {
 			const purpose = requiredText(body.purpose, "purpose", 500);
 			if (staffId && !departmentId)
 				throw new HttpError(400, "Host requires a department");
+			let visitorSessionTokenHash: string | null = null;
+			if (body.visitor_session_token != null) {
+				if (
+					typeof body.visitor_session_token !== "string" ||
+					!/^[A-Za-z0-9_-]{43}$/.test(body.visitor_session_token)
+				) {
+					throw new HttpError(400, "Invalid visitor session token");
+				}
+				visitorSessionTokenHash = `\\x${await sha256Hex(body.visitor_session_token)}`;
+			}
 
 			const service = ctx.supabaseAdmin;
 			const submission = {
@@ -66,6 +76,7 @@ export default {
 				p_visit_type: visitType,
 				p_purpose: purpose,
 				p_submission_idempotency_key: idempotencyKey,
+				p_visitor_session_token_hash: visitorSessionTokenHash,
 			};
 			const { data: activeLocation, error: locationError } = await service
 				.from("locations")
@@ -90,7 +101,12 @@ export default {
 			if (existingError?.code === "PT409")
 				throw new HttpError(409, "Idempotency key already used for a different request");
 			if (existingError) throw existingError;
-			if (existing) return json({ accepted: true }, 202);
+			if (existing) {
+				return json({
+					accepted: true,
+					visitor_session_created: visitorSessionTokenHash !== null,
+				}, 202);
+			}
 
 			const turnstileToken = requiredText(
 				body.turnstile_token,
@@ -157,7 +173,10 @@ export default {
 				}
 				throw createError;
 			}
-			return json({ accepted: true }, 202);
+			return json({
+				accepted: true,
+				visitor_session_created: visitorSessionTokenHash !== null,
+			}, 202);
 		} catch (error) {
 			return failure(error);
 		}
