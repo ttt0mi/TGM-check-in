@@ -98,6 +98,12 @@ export default {
 			const { data: existing, error: existingError } = await service.rpc(
 				"tgm_public_visit_retry_matches", submission,
 			);
+			if (
+				existingError?.code === "PT409" &&
+				existingError.message === "Visitor session already has a visit"
+			) {
+				throw new HttpError(409, "Visitor session already has a visit");
+			}
 			if (existingError?.code === "PT409")
 				throw new HttpError(409, "Idempotency key already used for a different request");
 			if (existingError) throw existingError;
@@ -159,13 +165,15 @@ export default {
 				"tgm_create_public_visit", submission,
 			);
 			if (createError) {
+				if (
+					createError.code === "PT409" &&
+					createError.message === "Visitor session already has a visit"
+				) {
+					throw new HttpError(409, "Visitor session already has a visit");
+				}
 				if (createError.code === "PT409")
 					throw new HttpError(409, "Idempotency key already used for a different request");
-				if (
-					createError.code === "23503" ||
-					createError.code === "23514" ||
-					createError.code === "P0001"
-				) {
+				if (["23503", "23514", "P0001"].includes(createError.code)) {
 					throw new HttpError(
 						400,
 						"Location, department or host is unavailable",
