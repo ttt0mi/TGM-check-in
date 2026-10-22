@@ -126,7 +126,9 @@ retained for the lifetime of their visit.
 The replacement visitor frontend can optionally create a 24-hour visitor
 status session when a QR check-in is submitted. The QR code identifies the
 branch; the session is a separate secret that lets that visitor's browser poll
-the limited status of that one visit. Checkout provenance, administrative
+the limited status of that one visit for 24 hours, including its final outcome.
+The session remains read-only and cannot be reused for another check-in.
+Checkout provenance, administrative
 corrections, token requirements, and the public status endpoint are documented
 in [the lifecycle contract](docs/visit-lifecycle-accountability.md). Actual
 self checkout remains disabled until the geofence and face-verification phase.

@@ -49,6 +49,13 @@ organization and branch names, the host's display name, and relevant visit
 times. The secret does not grant operator access, expose contact details,
 verify the visitor's identity or location, or enable self checkout.
 
+The token is bound to its first visit. An exact retry of the same check-in must
+reuse both the idempotency key and token. A different check-in cannot reuse
+that token, even after its 24-hour session expires and is deleted; the retained
+submission record causes the backend to return HTTP 409 with
+`Visitor session already has a visit`. The frontend must generate a fresh
+random token and idempotency key for every legitimate new check-in.
+
 The replacement frontend may add `visitor_session_token` to the existing
 `submit-public-visit` request. It must be a cryptographically random 32-byte
 value encoded as 43 unpadded base64url characters. Generate and retain it
@@ -72,19 +79,24 @@ organization and branch names, admission and departure times, and
 `self_checkout_available: false`. It does not expose visitor contact details,
 internal IDs, or token hashes.
 
-The 24-hour lifetime begins when the check-in is created. The credential is
-revoked sooner when the visit is declined, cancelled, checked out, auto-closed,
-or administratively closed. After revocation, the endpoint returns a generic
-unavailable response instead of the terminal status. Expired, malformed, and
-unknown credentials return the same response. Store the token in tab-scoped
-session storage in the later frontend, never in a URL or persistent
-shared-tablet storage, and clear it when the visitor finishes using a shared
-device.
+The 24-hour lifetime begins when the check-in is created. Declined, cancelled,
+checked-out, auto-closed, and administratively closed visits remain readable
+until that expiry so the visitor can see the final outcome and departure time.
+The session is read-only and `self_checkout_available` remains false after any
+terminal status. Expired, malformed, and unknown credentials return the same
+generic unavailable response. Store the token in tab-scoped session storage in
+the later frontend, never in a URL or persistent shared-tablet storage, and
+clear it when the visitor finishes using a shared device.
+
+When geofenced self checkout is implemented, the backend must independently
+confirm that the visit is still on site and that all location and face checks
+pass. The frontend must disable the checkout button as soon as the visitor is
+outside the permitted geofence. A completed visit must never expose another
+visitor action through this session.
 
 ## Maintenance and rollout
 
-The `tgm-visitor-session-cleanup` Cron job removes expired sessions daily and
-revoked sessions after one day. Apply the database migration and deploy both
-updated public functions together. Regenerate public database types after the
-migration. Organization signup remains disabled until its separate frontend
-and rollout checks are complete.
+The `tgm-visitor-session-cleanup` Cron job removes expired sessions daily.
+Apply the database migration and deploy both updated public functions together.
+Regenerate public database types after the migration. Organization signup
+remains disabled until its separate frontend and rollout checks are complete.
