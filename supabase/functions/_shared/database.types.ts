@@ -384,36 +384,69 @@ export type Database = {
       }
       visit_events: {
         Row: {
+          actor_role: Database["public"]["Enums"]["tgm_operator_role"] | null
+          actor_user_id: string | null
           event_source: string
           event_type: string
           id: number
+          location_id: string
           metadata: Json
           occurred_at: string
+          organization_id: string
           visit_id: string
         }
         Insert: {
+          actor_role?: Database["public"]["Enums"]["tgm_operator_role"] | null
+          actor_user_id?: string | null
           event_source: string
           event_type: string
           id?: never
+          location_id: string
           metadata?: Json
           occurred_at?: string
+          organization_id: string
           visit_id: string
         }
         Update: {
+          actor_role?: Database["public"]["Enums"]["tgm_operator_role"] | null
+          actor_user_id?: string | null
           event_source?: string
           event_type?: string
           id?: never
+          location_id?: string
           metadata?: Json
           occurred_at?: string
+          organization_id?: string
           visit_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "visit_events_actor_organization_fk"
+            columns: ["actor_user_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "operator_profiles"
+            referencedColumns: ["user_id", "organization_id"]
+          },
+          {
+            foreignKeyName: "visit_events_location_organization_fk"
+            columns: ["location_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id", "organization_id"]
+          },
           {
             foreignKeyName: "visit_events_visit_id_fkey"
             columns: ["visit_id"]
             isOneToOne: false
             referencedRelation: "visits"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visit_events_visit_organization_fk"
+            columns: ["visit_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "visits"
+            referencedColumns: ["id", "organization_id"]
           },
         ]
       }
@@ -422,6 +455,14 @@ export type Database = {
           admitted_at: string | null
           arrived_at: string
           check_in_method: Database["public"]["Enums"]["tgm_check_in_method"]
+          checkout_actor_id: string | null
+          checkout_corrected_at: string | null
+          checkout_corrected_by: string | null
+          checkout_correction_reason: string | null
+          checkout_location_id: string | null
+          checkout_method:
+            | Database["public"]["Enums"]["tgm_checkout_method"]
+            | null
           created_at: string
           department_id: string | null
           host_approved_at: string | null
@@ -446,6 +487,14 @@ export type Database = {
           admitted_at?: string | null
           arrived_at?: string
           check_in_method: Database["public"]["Enums"]["tgm_check_in_method"]
+          checkout_actor_id?: string | null
+          checkout_corrected_at?: string | null
+          checkout_corrected_by?: string | null
+          checkout_correction_reason?: string | null
+          checkout_location_id?: string | null
+          checkout_method?:
+            | Database["public"]["Enums"]["tgm_checkout_method"]
+            | null
           created_at?: string
           department_id?: string | null
           host_approved_at?: string | null
@@ -470,6 +519,14 @@ export type Database = {
           admitted_at?: string | null
           arrived_at?: string
           check_in_method?: Database["public"]["Enums"]["tgm_check_in_method"]
+          checkout_actor_id?: string | null
+          checkout_corrected_at?: string | null
+          checkout_corrected_by?: string | null
+          checkout_correction_reason?: string | null
+          checkout_location_id?: string | null
+          checkout_method?:
+            | Database["public"]["Enums"]["tgm_checkout_method"]
+            | null
           created_at?: string
           department_id?: string | null
           host_approved_at?: string | null
@@ -491,6 +548,27 @@ export type Database = {
           visitor_preferred_name?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "visits_checkout_actor_organization_fk"
+            columns: ["checkout_actor_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "operator_profiles"
+            referencedColumns: ["user_id", "organization_id"]
+          },
+          {
+            foreignKeyName: "visits_checkout_corrector_organization_fk"
+            columns: ["checkout_corrected_by", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "operator_profiles"
+            referencedColumns: ["user_id", "organization_id"]
+          },
+          {
+            foreignKeyName: "visits_checkout_location_organization_fk"
+            columns: ["checkout_location_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id", "organization_id"]
+          },
           {
             foreignKeyName: "visits_department_id_fkey"
             columns: ["department_id"]
@@ -599,22 +677,40 @@ export type Database = {
         }
         Returns: string
       }
-      tgm_create_public_visit: {
-        Args: {
-          p_department_id: string
-          p_organization: string
-          p_phone_number: string
-          p_public_slug: string
-          p_purpose: string
-          p_staff_id: string
-          p_submission_idempotency_key: string
-          p_visit_type: Database["public"]["Enums"]["tgm_visit_type"]
-          p_visitor_email: string
-          p_visitor_full_name: string
-          p_visitor_preferred_name: string
-        }
-        Returns: string
-      }
+      tgm_create_public_visit:
+        | {
+            Args: {
+              p_department_id: string
+              p_organization: string
+              p_phone_number: string
+              p_public_slug: string
+              p_purpose: string
+              p_staff_id: string
+              p_submission_idempotency_key: string
+              p_visit_type: Database["public"]["Enums"]["tgm_visit_type"]
+              p_visitor_email: string
+              p_visitor_full_name: string
+              p_visitor_preferred_name: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_department_id: string
+              p_organization: string
+              p_phone_number: string
+              p_public_slug: string
+              p_purpose: string
+              p_staff_id: string
+              p_submission_idempotency_key: string
+              p_visit_type: Database["public"]["Enums"]["tgm_visit_type"]
+              p_visitor_email: string
+              p_visitor_full_name: string
+              p_visitor_preferred_name: string
+              p_visitor_session_token_hash: string
+            }
+            Returns: string
+          }
       tgm_finish_host_email: {
         Args: {
           p_attempt_id: string
@@ -623,6 +719,19 @@ export type Database = {
           p_status: Database["public"]["Enums"]["tgm_notification_status"]
         }
         Returns: boolean
+      }
+      tgm_get_visitor_visit: {
+        Args: { p_token_hash: string }
+        Returns: {
+          admitted_at: string
+          branch_name: string
+          host_name: string
+          organization_name: string
+          self_checkout_available: boolean
+          status: Database["public"]["Enums"]["tgm_visit_status"]
+          time_out: string
+          visitor_display_name: string
+        }[]
       }
       tgm_manage_operator: {
         Args: {
@@ -662,6 +771,14 @@ export type Database = {
           admitted_at: string | null
           arrived_at: string
           check_in_method: Database["public"]["Enums"]["tgm_check_in_method"]
+          checkout_actor_id: string | null
+          checkout_corrected_at: string | null
+          checkout_corrected_by: string | null
+          checkout_correction_reason: string | null
+          checkout_location_id: string | null
+          checkout_method:
+            | Database["public"]["Enums"]["tgm_checkout_method"]
+            | null
           created_at: string
           department_id: string | null
           host_approved_at: string | null
@@ -698,22 +815,40 @@ export type Database = {
         }
         Returns: string
       }
-      tgm_public_visit_retry_matches: {
-        Args: {
-          p_department_id: string
-          p_organization: string
-          p_phone_number: string
-          p_public_slug: string
-          p_purpose: string
-          p_staff_id: string
-          p_submission_idempotency_key: string
-          p_visit_type: Database["public"]["Enums"]["tgm_visit_type"]
-          p_visitor_email: string
-          p_visitor_full_name: string
-          p_visitor_preferred_name: string
-        }
-        Returns: boolean
-      }
+      tgm_public_visit_retry_matches:
+        | {
+            Args: {
+              p_department_id: string
+              p_organization: string
+              p_phone_number: string
+              p_public_slug: string
+              p_purpose: string
+              p_staff_id: string
+              p_submission_idempotency_key: string
+              p_visit_type: Database["public"]["Enums"]["tgm_visit_type"]
+              p_visitor_email: string
+              p_visitor_full_name: string
+              p_visitor_preferred_name: string
+            }
+            Returns: boolean
+          }
+        | {
+            Args: {
+              p_department_id: string
+              p_organization: string
+              p_phone_number: string
+              p_public_slug: string
+              p_purpose: string
+              p_staff_id: string
+              p_submission_idempotency_key: string
+              p_visit_type: Database["public"]["Enums"]["tgm_visit_type"]
+              p_visitor_email: string
+              p_visitor_full_name: string
+              p_visitor_preferred_name: string
+              p_visitor_session_token_hash: string
+            }
+            Returns: boolean
+          }
       tgm_register_organization: {
         Args: { p_actor_id: string; p_name: string }
         Returns: string
@@ -725,6 +860,11 @@ export type Database = {
     }
     Enums: {
       tgm_check_in_method: "qr" | "assisted"
+      tgm_checkout_method:
+        | "self"
+        | "receptionist_assisted"
+        | "system_auto_close"
+        | "admin_correction"
       tgm_notification_status: "sending" | "sent" | "failed" | "unknown"
       tgm_operator_role: "admin" | "receptionist"
       tgm_visit_status:
@@ -871,6 +1011,12 @@ export const Constants = {
   public: {
     Enums: {
       tgm_check_in_method: ["qr", "assisted"],
+      tgm_checkout_method: [
+        "self",
+        "receptionist_assisted",
+        "system_auto_close",
+        "admin_correction",
+      ],
       tgm_notification_status: ["sending", "sent", "failed", "unknown"],
       tgm_operator_role: ["admin", "receptionist"],
       tgm_visit_status: [
