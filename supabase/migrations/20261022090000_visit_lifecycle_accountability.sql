@@ -61,7 +61,22 @@ alter table public.visits
         and checkout_corrected_by is not null
         and checkout_correction_reason is not null
         and char_length(btrim(checkout_correction_reason)) between 1 and 500)
-    );
+    ),
+  add constraint visits_checkout_correction_is_terminal
+    check (checkout_corrected_at is null or status in ('checked_out', 'auto_closed'));
+
+create function tgm_private.prevent_visit_branch_move()
+returns trigger language plpgsql set search_path = '' as $$
+begin
+  if old.location_id is distinct from new.location_id then
+    raise exception 'Visit branch cannot be changed';
+  end if;
+  return new;
+end;
+$$;
+create trigger visits_prevent_branch_move
+  before update of location_id on public.visits
+  for each row execute function tgm_private.prevent_visit_branch_move();
 
 create index visits_checkout_reporting_idx
   on public.visits (organization_id, checkout_location_id, time_out desc)
@@ -159,15 +174,18 @@ create trigger visit_events_populate_context
   before insert on public.visit_events
   for each row execute function tgm_private.populate_visit_event_context();
 
-create function tgm_private.prevent_visit_event_update()
+create function tgm_private.prevent_visit_event_mutation()
 returns trigger language plpgsql set search_path = '' as $$
 begin
+  -- Visit retention runs through owner-executed functions and relies on the
+  -- visit foreign key's delete cascade. Other callers may not alter history.
+  if tg_op = 'DELETE' and current_user = 'postgres' then return old; end if;
   raise exception 'Visit events are append-only';
 end;
 $$;
 create trigger visit_events_append_only
-  before update on public.visit_events
-  for each row execute function tgm_private.prevent_visit_event_update();
+  before update or delete on public.visit_events
+  for each row execute function tgm_private.prevent_visit_event_mutation();
 
 create table tgm_private.visitor_sessions (
   token_hash bytea primary key check (octet_length(token_hash) = 32),

@@ -149,6 +149,57 @@ begin
   exception when raise_exception then
     if sqlerrm <> 'Visit events are append-only' then raise; end if;
   end;
+
+  begin
+    update public.visits
+      set location_id = 'bc000000-0000-4000-8000-000000000001'
+      where id = visit_id_value;
+    raise exception 'Visit branch change was accepted';
+  exception when raise_exception then
+    if sqlerrm <> 'Visit branch cannot be changed' then raise; end if;
+  end;
+end;
+$$;
+
+set local role service_role;
+do $$
+declare event_id_value bigint;
+begin
+  select id into event_id_value
+  from public.visit_events
+  where visit_id = (
+    select id from public.visits
+    where visitor_full_name = 'QR Visitor'
+  )
+  order by id
+  limit 1;
+  begin
+    delete from public.visit_events where id = event_id_value;
+    raise exception 'Service role deleted visit history';
+  exception when raise_exception then
+    if sqlerrm <> 'Visit events are append-only' then raise; end if;
+  end;
+end;
+$$;
+reset role;
+
+do $$
+declare visit_id_value uuid;
+declare removed_count integer;
+begin
+  select id into visit_id_value
+  from public.visits
+  where visitor_full_name = 'QR Visitor';
+  update public.visits
+    set arrived_at = now() - interval '13 months'
+    where id = visit_id_value;
+  removed_count := tgm_private.purge_expired_visits(200);
+  if removed_count <> 1 then
+    raise exception 'Visit retention did not remove the expired visit';
+  end if;
+  if exists (select 1 from public.visit_events where visit_id = visit_id_value) then
+    raise exception 'Owner-run retention did not cascade through visit events';
+  end if;
 end;
 $$;
 
