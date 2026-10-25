@@ -26,6 +26,13 @@ export default async function CheckInPage({ params }: { params: Promise<{ token:
 					detail="This branch code is inactive or invalid. Ask reception for a current code."
 				/>
 			);
+		if (error instanceof RequestError && error.status === 412)
+			return (
+				<Unavailable
+					title="Check-in is not configured"
+					detail="This organization has not approved its visitor privacy notice. Please ask reception to check you in."
+				/>
+			);
 		return (
 			<Unavailable
 				title="Check-in temporarily unavailable"

@@ -38,6 +38,12 @@ createServer(async (request, response) => {
 		if (url.searchParams.get("location") !== branchId) return reply(response, 404, { error: "Unknown branch" });
 		return reply(response, 200, {
 			organization: { name: "Example Organization" },
+			privacy_notice: {
+				notice_copy:
+					"Example Organization uses your details to manage this visit. Reception and your host can see relevant details. Ask reception for retention information.",
+				policy_url: "https://example.com/privacy",
+				approved_at: "2026-10-25T00:00:00Z",
+			},
 			location: {
 				name: "Lagos Branch",
 				address: "1 Test Street",
@@ -47,7 +53,8 @@ createServer(async (request, response) => {
 				{
 					id: departmentId,
 					name: "Operations",
-					staff: [{ id: hostId, name: "Ada Host" }],
+					staff:
+						url.searchParams.get("department") === departmentId ? [{ id: hostId, name: "Ada Host" }] : [],
 				},
 			],
 		});

@@ -16,7 +16,7 @@ test.beforeEach(async ({ page }) => {
 test("visitor sees pending and terminal status without another action", async ({ page, request }) => {
 	await page.goto(route);
 	await expect(page.getByRole("heading", { name: "Welcome to Lagos Branch" })).toBeVisible();
-	await expect(page.getByText("Example Organization")).toBeVisible();
+	await expect(page.getByText("Example Organization", { exact: true })).toBeVisible();
 	await page.getByRole("button", { name: "24-hour" }).click();
 	await expect(page.getByRole("button", { name: "24-hour" })).toHaveAttribute("aria-pressed", "true");
 	await page.getByLabel("Full name").fill("Visitor Example");
@@ -26,9 +26,10 @@ test("visitor sees pending and terminal status without another action", async ({
 	await page.getByLabel("Host (optional)").selectOption({ label: "Ada Host" });
 	await page.getByRole("button", { name: "Check in" }).click();
 	await expect(page.getByText("Reception is reviewing your visit")).toBeVisible();
+	await expect(page.getByRole("button", { name: "Check in another visitor" })).toBeVisible();
 	await page.reload();
 	await expect(page.getByText("Reception is reviewing your visit")).toBeVisible();
-	await expect(page.getByRole("button", { name: "Check in" })).toHaveCount(0);
+	await expect(page.getByRole("button", { name: "Check in", exact: true })).toHaveCount(0);
 	await expect(page.getByRole("button", { name: "24-hour" })).toHaveAttribute("aria-pressed", "true");
 	await page.getByRole("button", { name: "Stopwatch" }).click();
 	await expect(page.getByLabel("Elapsed visit time")).toHaveText("00:00:00");
@@ -53,7 +54,21 @@ test("visitor sees pending and terminal status without another action", async ({
 	await expect(page.getByText("You have checked out")).toBeVisible();
 	await expect(page.getByLabel("Elapsed visit time")).toHaveText("00:01:05");
 	await expect(page.getByText("Stopped at checkout.")).toBeVisible();
-	await expect(page.getByRole("button", { name: "Check in" })).toHaveCount(0);
+	await expect(page.getByRole("button", { name: "Check in", exact: true })).toHaveCount(0);
+});
+
+test("a shared tablet can hand off to the next visitor", async ({ page }) => {
+	await page.goto(route);
+	await page.getByLabel("Full name").fill("First Visitor");
+	await page.getByLabel("Phone number").fill("+2348012345678");
+	await page.getByLabel("Purpose").fill("Meeting");
+	await page.getByRole("button", { name: "Check in", exact: true }).click();
+	await expect(page.getByText("Reception is reviewing your visit")).toBeVisible();
+	await page.getByRole("button", { name: "Check in another visitor" }).click();
+	await expect(page.getByLabel("Full name")).toHaveValue("");
+	await page.reload();
+	await expect(page.getByLabel("Full name")).toBeVisible();
+	await expect(page.getByText("First Visitor")).toHaveCount(0);
 });
 
 test("check-in and login surfaces have no serious accessibility violations", async ({ page }) => {

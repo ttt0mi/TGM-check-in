@@ -113,7 +113,8 @@ jobs:
                     supabase/tests/public_checkin_retries.sql \
                     supabase/tests/tenant_isolation.sql \
                     supabase/tests/visit_lifecycle_accountability.sql \
-                    supabase/tests/operator_invitation_delivery.sql; do
+                    supabase/tests/operator_invitation_delivery.sql \
+                    supabase/tests/public_privacy_notice.sql; do
                     docker exec -i supabase_db_TGM-check-in \
                       psql -U postgres -d postgres -v ON_ERROR_STOP=1 < "$test_file" || exit 1
                   done

@@ -20,7 +20,7 @@ function kindForStatus(status: number): RequestFailureKind {
 	if (status === 404 || status === 410) return "missing";
 	if (status === 409) return "conflict";
 	if (status === 429) return "rate_limited";
-	if (status === 503 || status === 504) return "unavailable";
+	if (status === 412 || status === 503 || status === 504) return "unavailable";
 	return "unexpected";
 }
 

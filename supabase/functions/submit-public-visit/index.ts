@@ -94,6 +94,13 @@ export default {
 				.maybeSingle();
 			if (organizationError) throw organizationError;
 			if (!activeOrganization) throw new HttpError(400, "Location unavailable");
+			const { data: notice, error: noticeError } = await service
+				.from("organization_privacy_notices")
+				.select("organization_id")
+				.eq("organization_id", activeLocation.organization_id)
+				.maybeSingle();
+			if (noticeError) throw noticeError;
+			if (!notice) throw new HttpError(412, "Public check-in is not configured");
 			// A matching completed request can be replayed without another CAPTCHA.
 			const { data: existing, error: existingError } = await service.rpc(
 				"tgm_public_visit_retry_matches", submission,

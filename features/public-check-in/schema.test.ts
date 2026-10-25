@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { publicVisitSchema } from "./schema";
+import { normalizePhone, publicVisitSchema } from "./schema";
 
 const valid = {
 	visitor_full_name: "Jane Doe",
@@ -23,7 +23,16 @@ describe("public visit form", () => {
 	});
 
 	it("rejects invalid contact details", () => {
-		expect(publicVisitSchema.safeParse({ ...valid, phone_number: "08012345678" }).success).toBe(false);
+		expect(publicVisitSchema.safeParse({ ...valid, phone_number: "080123456" }).success).toBe(false);
 		expect(publicVisitSchema.safeParse({ ...valid, visitor_email: "wrong" }).success).toBe(false);
+	});
+
+	it("normalizes ordinary Nigerian input without guessing ambiguous country codes", () => {
+		expect(normalizePhone("0801 234 5678")).toBe("+2348012345678");
+		expect(normalizePhone("+234 (801) 234-5678")).toBe("+2348012345678");
+		expect(publicVisitSchema.parse({ ...valid, phone_number: "0801 234 5678" }).phone_number).toBe(
+			"+2348012345678",
+		);
+		expect(publicVisitSchema.safeParse({ ...valid, phone_number: "2348012345678" }).success).toBe(false);
 	});
 });

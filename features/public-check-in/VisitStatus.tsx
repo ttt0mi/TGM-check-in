@@ -28,6 +28,9 @@ export function VisitStatus({
 }) {
 	const [visit, setVisit] = useState<VisitorVisit | null>(null);
 	const [error, setError] = useState("");
+	const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+	const [retryCounter, setRetryCounter] = useState(0);
+	const [online, setOnline] = useState(true);
 
 	useEffect(() => {
 		let active = true;
@@ -37,6 +40,7 @@ export function VisitStatus({
 				const latest = await getVisitorVisit(token);
 				if (!active) return;
 				setVisit(latest);
+				setLastUpdated(new Date());
 				onVisitChange(latest);
 				setError("");
 				if (!terminalStatuses.has(latest.status)) timer = setTimeout(refresh, 15000);
@@ -55,13 +59,18 @@ export function VisitStatus({
 			}
 		}
 		void refresh();
+		const onOnline = () => setOnline(navigator.onLine);
+		window.addEventListener("online", onOnline);
+		window.addEventListener("offline", onOnline);
 		document.addEventListener("visibilitychange", onVisible);
 		return () => {
 			active = false;
 			if (timer) clearTimeout(timer);
 			document.removeEventListener("visibilitychange", onVisible);
+			window.removeEventListener("online", onOnline);
+			window.removeEventListener("offline", onOnline);
 		};
-	}, [token, onUnavailable, onVisitChange]);
+	}, [token, onUnavailable, onVisitChange, retryCounter]);
 
 	return (
 		<section className={styles.status} aria-live="polite">
@@ -81,6 +90,19 @@ export function VisitStatus({
 				<p>Loading your visit…</p>
 			)}
 			{error && <p role="alert">{error}</p>}
+			{!online && <p role="status">You are offline. Status updates will resume when your connection returns.</p>}
+			{lastUpdated && (
+				<p>
+					Last updated {lastUpdated.toLocaleTimeString()}.{" "}
+					{visit && !terminalStatuses.has(visit.status)
+						? "Automatic updates every 15 seconds."
+						: "This visit is complete; refresh manually for any correction."}
+				</p>
+			)}
+			{error && <p>We will retry in 30 seconds.</p>}
+			<button type="button" onClick={() => setRetryCounter((value) => value + 1)}>
+				Refresh status
+			</button>
 		</section>
 	);
 }

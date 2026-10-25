@@ -12,13 +12,30 @@ function key(slug: string) {
 }
 
 export function loadVisitorToken(slug: string) {
-	const token = sessionStorage.getItem(key(slug));
-	return token && tokenPattern.test(token) ? token : null;
+	try {
+		const token = sessionStorage.getItem(key(slug));
+		return token && tokenPattern.test(token) ? token : null;
+	} catch {
+		return null;
+	}
 }
 
 export function saveVisitorToken(slug: string, token: string) {
 	if (!tokenPattern.test(token)) throw new Error("Invalid visitor session token");
-	sessionStorage.setItem(key(slug), token);
+	try {
+		sessionStorage.setItem(key(slug), token);
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+export function clearVisitorToken(slug: string) {
+	try {
+		sessionStorage.removeItem(key(slug));
+	} catch {
+		// Keep the current tab's in-memory flow available when storage is blocked.
+	}
 }
 
 export const terminalStatuses = new Set(["checked_out", "declined", "cancelled", "auto_closed"]);

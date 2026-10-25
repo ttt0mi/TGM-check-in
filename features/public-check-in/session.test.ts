@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { createVisitorToken, loadVisitorToken, saveVisitorToken, terminalStatuses } from "./session";
+import { clearVisitorToken, createVisitorToken, loadVisitorToken, saveVisitorToken, terminalStatuses } from "./session";
 
 describe("visitor session credentials", () => {
 	beforeEach(() => sessionStorage.clear());
@@ -17,6 +17,8 @@ describe("visitor session credentials", () => {
 		saveVisitorToken("branch-a", token);
 		expect(loadVisitorToken("branch-a")).toBe(token);
 		expect(loadVisitorToken("branch-b")).toBeNull();
+		clearVisitorToken("branch-a");
+		expect(loadVisitorToken("branch-a")).toBeNull();
 	});
 
 	it("treats every completed visit state as terminal", () => {

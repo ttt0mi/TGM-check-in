@@ -19,8 +19,10 @@ async function invoke<T>(name: string, init: RequestInit): Promise<T> {
 	return (await response.json()) as T;
 }
 
-export function getPublicDirectory(slug: string) {
-	return invoke<PublicDirectory>(`get-public-directory?location=${encodeURIComponent(slug)}`, { method: "GET" });
+export function getPublicDirectory(slug: string, departmentId?: string) {
+	const query = new URLSearchParams({ location: slug });
+	if (departmentId) query.set("department", departmentId);
+	return invoke<PublicDirectory>(`get-public-directory?${query}`, { method: "GET" });
 }
 
 export function submitPublicVisit(body: Record<string, unknown>) {

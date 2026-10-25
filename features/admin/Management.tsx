@@ -12,11 +12,13 @@ import styles from "./admin.module.css";
 
 export function Management({
 	organization,
+	privacyNotice,
 	branches,
 	departments,
 	staff,
 }: {
 	organization: { id: string; name: string; is_active: boolean };
+	privacyNotice: { notice_copy: string; policy_url: string; approved_at: string; approved_by: string } | null;
 	branches: Branch[];
 	departments: Department[];
 	staff: Staff[];
@@ -37,7 +39,9 @@ export function Management({
 					</button>
 				))}
 			</nav>
-			{tab === "organization" && <OrganizationSettings organization={organization} onChanged={refresh} />}
+			{tab === "organization" && (
+				<OrganizationSettings organization={organization} privacyNotice={privacyNotice} onChanged={refresh} />
+			)}
 			{tab === "branches" && <BranchManagement branches={branches} onChanged={refresh} />}
 			{tab === "directory" && (
 				<DirectoryManagement
