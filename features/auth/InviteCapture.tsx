@@ -31,7 +31,7 @@ export function InviteCapture() {
 			);
 	}, [router]);
 	return (
-		<main>
+		<main id="main-content">
 			<h1>Operator invitation</h1>
 			<p role="status">{message}</p>
 			<a href="/login">Sign in</a>

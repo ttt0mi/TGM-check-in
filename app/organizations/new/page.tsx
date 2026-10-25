@@ -1,9 +1,16 @@
-import { notFound, redirect } from "next/navigation";
+import { redirect } from "next/navigation";
 import { CreateOrganization } from "@/features/auth/CreateOrganization";
+import { Unavailable } from "@/features/shared/Unavailable";
 import { frontendEnabled } from "@/lib/feature-flags";
 import { createClient } from "@/lib/supabase/server";
 export default async function CreateOrganizationPage() {
-	if (!frontendEnabled("auth")) notFound();
+	if (!frontendEnabled("auth"))
+		return (
+			<Unavailable
+				title="Organization setup is unavailable"
+				detail="Please contact your organization administrator."
+			/>
+		);
 	const supabase = await createClient();
 	const {
 		data: { user },

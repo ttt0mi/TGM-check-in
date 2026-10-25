@@ -36,7 +36,7 @@ export function HostDecision() {
 	}
 
 	return (
-		<main className={styles.page}>
+		<main id="main-content" className={styles.page}>
 			<div className={styles.card}>
 				<div className={styles.brand}>
 					TGM <span>Host decision</span>

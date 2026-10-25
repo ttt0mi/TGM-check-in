@@ -1,10 +1,14 @@
-import { notFound, redirect } from "next/navigation";
+import { redirect } from "next/navigation";
 import { OperatorDashboard } from "@/features/operator/OperatorDashboard";
+import { Unavailable } from "@/features/shared/Unavailable";
 import { frontendEnabled } from "@/lib/feature-flags";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function OperatorPage() {
-	if (!frontendEnabled("operator")) notFound();
+	if (!frontendEnabled("operator"))
+		return (
+			<Unavailable title="Reception is unavailable" detail="Please contact your organization administrator." />
+		);
 	const supabase = await createClient();
 	const {
 		data: { user },
@@ -59,6 +63,7 @@ export default async function OperatorPage() {
 		<OperatorDashboard
 			organization={{ id: profile.organization_id, name: organization.name }}
 			role={profile.role}
+			availableSections={{ admin: frontendEnabled("admin"), analytics: frontendEnabled("analytics") }}
 			branches={branches ?? []}
 			initialVisits={visitsResult.data ?? []}
 			departments={departmentsResult.data ?? []}

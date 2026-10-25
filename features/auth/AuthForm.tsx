@@ -115,7 +115,7 @@ export function AuthForm({ mode, notice }: { mode: AuthMode; notice?: string }) 
 		reset: "Choose a new password",
 	}[mode];
 	return (
-		<main className={styles.page}>
+		<main id="main-content" className={styles.page}>
 			<form className={styles.card} onSubmit={form.handleSubmit(submit)} noValidate>
 				<div className={styles.brand}>TGM</div>
 				<h1>{title}</h1>

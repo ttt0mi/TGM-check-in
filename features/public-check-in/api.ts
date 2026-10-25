@@ -1,4 +1,5 @@
 import { supabaseConfig } from "@/lib/supabase/config";
+import { networkError, requestError } from "@/lib/http/request-error";
 import type { PublicDirectory, VisitorVisit } from "./types";
 
 async function invoke<T>(name: string, init: RequestInit): Promise<T> {
@@ -11,10 +12,11 @@ async function invoke<T>(name: string, init: RequestInit): Promise<T> {
 			...init.headers,
 		},
 		cache: "no-store",
+	}).catch(() => {
+		throw networkError();
 	});
-	const body = (await response.json()) as T & { error?: string };
-	if (!response.ok) throw new Error(body.error || "Request failed. Please try again.");
-	return body;
+	if (!response.ok) throw await requestError(response);
+	return (await response.json()) as T;
 }
 
 export function getPublicDirectory(slug: string) {

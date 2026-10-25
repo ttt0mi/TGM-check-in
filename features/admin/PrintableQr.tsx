@@ -13,7 +13,7 @@ export function PrintableQr({
 	url: string;
 }) {
 	return (
-		<main className={styles.page}>
+		<main id="main-content" className={styles.page}>
 			<a href="/app/manage">← Manage</a>
 			<section className={styles.section}>
 				<h1>{organizationName}</h1>

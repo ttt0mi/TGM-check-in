@@ -2,7 +2,7 @@
 
 TGM Check-in is a branch-based visitor management application. The Supabase backend handles tenancy, visit lifecycle, host decisions, and operator authorization. The Next.js frontend provides visitor check-in, host decisions, account onboarding, reception operations, organization management, and analytics.
 
-The frontend is being released route by route. Production feature flags default to off; local development defaults to on. The old demo page and its API routes remain available during the cutover.
+The current application starts at `/start`. Production feature flags control route availability and local development defaults to enabled. Disabled routes show an explicit unavailable state. The acceptance contract for the remaining rollout is [the frontend remediation handoff](docs/frontend-ui-remediation-handoff.md).
 
 ## Local setup
 
@@ -34,7 +34,7 @@ Set the following server-side variables to `true` to enable routes in production
 
 `TGM_ENABLE_ORGANIZATION_SIGNUP` is a separate **Supabase Edge Function secret**. Leave it disabled until the tenant rollout checks in [the tenancy runbook](docs/tenancy-foundation.md) pass. A verified, unassigned user can then create an organization and become its first admin. Customer admins can create branches and email operator invitations. Invited users sign in with the invited address before accepting. Platform administrators are provisioned manually and do not automatically receive customer visit access.
 
-The backend functions require `APP_ORIGIN`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `TURNSTILE_SECRET_KEY`, and `TURNSTILE_ALLOWED_HOSTNAME` in the deployed Supabase environment. `HOST_DECISION_ORIGIN` is supported temporarily as a fallback for `APP_ORIGIN`. Configure Supabase Auth email confirmation and redirect URLs for `/auth/callback` and `/auth/recover` in each environment. Install the recovery email template from `supabase/templates/recovery.html` in each hosted project; its token hash stays in a URL fragment until the user explicitly continues. Invitation and host links also carry their tokens in fragments.
+The backend functions require `APP_ORIGIN`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `TURNSTILE_SECRET_KEY`, and `TURNSTILE_ALLOWED_HOSTNAME` in the deployed Supabase environment. Configure Supabase Auth email confirmation and redirect URLs for `/auth/callback` and `/auth/recover` in each environment. Install the recovery email template from `supabase/templates/recovery.html` in each hosted project; its token hash stays in a URL fragment until the user explicitly continues. Invitation and host links also carry their tokens in fragments. The temporary `HOST_DECISION_ORIGIN` fallback must be removed after each deployed environment confirms `APP_ORIGIN`.
 
 ## Checks
 

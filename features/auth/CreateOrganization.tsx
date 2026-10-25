@@ -29,7 +29,7 @@ export function CreateOrganization({ availability }: { availability: "open" | "d
 		router.refresh();
 	}
 	return (
-		<main className={styles.page}>
+		<main id="main-content" className={styles.page}>
 			{availability !== "open" ? (
 				<div className={styles.card}>
 					<div className={styles.brand}>TGM</div>

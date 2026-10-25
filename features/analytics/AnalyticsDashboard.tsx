@@ -76,7 +76,7 @@ function Content({ role, branches }: { role: "admin" | "receptionist"; branches:
 		.sort(([a], [b]) => a.localeCompare(b))
 		.map(([hour, count]) => ({ hour, count }));
 	return (
-		<main className={styles.page}>
+		<main id="main-content" className={styles.page}>
 			<Link href="/app">← Visits</Link>
 			<h1>Visit analytics</h1>
 			<div className={styles.filters}>

@@ -67,6 +67,7 @@ test("check-in and login surfaces have no serious accessibility violations", asy
 
 test("clock swipes through the three views in both directions", async ({ page }) => {
 	await page.goto(route);
+	await page.getByRole("button", { name: "12-hour" }).click();
 	async function swipe(startX: number, endX: number) {
 		await page.evaluate(
 			({ startX, endX }) => {

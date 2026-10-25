@@ -65,7 +65,7 @@ export function AcceptInvite({ accountEmail }: { accountEmail: string }) {
 	}
 	const matchesAccount = preview?.invited_email?.toLowerCase() === accountEmail.toLowerCase();
 	return (
-		<main className={styles.page}>
+		<main id="main-content" className={styles.page}>
 			<div className={styles.card}>
 				<div className={styles.brand}>TGM</div>
 				<h1>Join the organization</h1>

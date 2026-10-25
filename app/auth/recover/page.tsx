@@ -1,8 +1,14 @@
 import { RecoveryLink } from "@/features/auth/RecoveryLink";
 import { frontendEnabled } from "@/lib/feature-flags";
-import { notFound } from "next/navigation";
+import { Unavailable } from "@/features/shared/Unavailable";
 
 export default function RecoverPage() {
-	if (!frontendEnabled("auth")) notFound();
+	if (!frontendEnabled("auth"))
+		return (
+			<Unavailable
+				title="Password recovery is unavailable"
+				detail="Please contact your organization administrator."
+			/>
+		);
 	return <RecoveryLink />;
 }

@@ -1,9 +1,13 @@
-import { notFound, redirect } from "next/navigation";
+import { redirect } from "next/navigation";
 import { AcceptInvite } from "@/features/auth/AcceptInvite";
+import { Unavailable } from "@/features/shared/Unavailable";
 import { frontendEnabled } from "@/lib/feature-flags";
 import { createClient } from "@/lib/supabase/server";
 export default async function AcceptInvitePage() {
-	if (!frontendEnabled("auth")) notFound();
+	if (!frontendEnabled("auth"))
+		return (
+			<Unavailable title="Invitations are unavailable" detail="Please contact your organization administrator." />
+		);
 	const supabase = await createClient();
 	const {
 		data: { user },

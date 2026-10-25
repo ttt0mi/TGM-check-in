@@ -16,3 +16,9 @@ The [master handoff](frontend-ui-remediation-handoff.md) remains the source of t
 - Apply and validate the two pending invitation migrations before deploying the invitation preview migration and Edge Function.
 - Reconcile generated database types against the intended deployed schema using the official CLI. The current CI hosted-type comparison targets a repository variable whose project value still needs confirmation.
 - No staging or production deployment, remote Git push, or live legacy-object deletion has occurred.
+
+## Local route cutover
+
+- `/` now redirects to `/start`; disabled routes explain unavailability. The public QR route distinguishes malformed/inactive codes from a directory service outage.
+- The seven legacy frontend/API files and unused Next.js `resend` dependency were removed after a reference search, replacement production build and six passing Playwright scenarios. A clean production build after deletion exposes none of the four retired API paths; both typechecks, unit tests, lint and format also pass.
+- Next.js route loading and error boundaries, a route/flag inventory, a safe HTTP error classifier, and a skip link are in place. The full typed Edge/PostgREST rollout and remaining recovery states are still part of the handoff acceptance contract.

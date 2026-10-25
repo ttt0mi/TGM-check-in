@@ -25,7 +25,7 @@ export function Management({
 	const [tab, setTab] = useState<"organization" | "branches" | "directory" | "access">("organization");
 	const refresh = () => router.refresh();
 	return (
-		<main className={styles.page}>
+		<main id="main-content" className={styles.page}>
 			<header>
 				<Link href="/app">← Visits</Link>
 				<h1>Manage {organization.name}</h1>

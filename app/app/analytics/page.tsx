@@ -1,10 +1,14 @@
-import { notFound, redirect } from "next/navigation";
+import { redirect } from "next/navigation";
 import { AnalyticsDashboard } from "@/features/analytics/AnalyticsDashboard";
+import { Unavailable } from "@/features/shared/Unavailable";
 import { frontendEnabled } from "@/lib/feature-flags";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function AnalyticsPage() {
-	if (!frontendEnabled("analytics")) notFound();
+	if (!frontendEnabled("analytics"))
+		return (
+			<Unavailable title="Analytics is unavailable" detail="Please return to reception and try again later." />
+		);
 	const supabase = await createClient();
 	const {
 		data: { user },

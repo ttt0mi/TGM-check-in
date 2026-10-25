@@ -16,6 +16,7 @@ import styles from "./operator.module.css";
 type Props = {
 	organization: { id: string; name: string };
 	role: "admin" | "receptionist";
+	availableSections: { admin: boolean; analytics: boolean };
 	branches: Branch[];
 	initialVisits: Visit[];
 	departments: Department[];
@@ -38,7 +39,15 @@ export function OperatorDashboard(props: Props) {
 	);
 }
 
-function DashboardContent({ organization, role, branches, initialVisits, departments, staff }: Props) {
+function DashboardContent({
+	organization,
+	role,
+	availableSections,
+	branches,
+	initialVisits,
+	departments,
+	staff,
+}: Props) {
 	const router = useRouter();
 	const [branchId, setBranchId] = useState(branches[0]?.id ?? "");
 	const [showAssisted, setShowAssisted] = useState(false);
@@ -54,15 +63,15 @@ function DashboardContent({ organization, role, branches, initialVisits, departm
 	}
 
 	return (
-		<main className={styles.page}>
+		<main id="main-content" className={styles.page}>
 			<header className={styles.header}>
 				<div>
 					<strong className={styles.brand}>TGM</strong>
 					<span>{organization.name}</span>
 				</div>
 				<nav>
-					{role === "admin" && <Link href="/app/manage">Manage</Link>}
-					<Link href="/app/analytics">Analytics</Link>
+					{role === "admin" && availableSections.admin && <Link href="/app/manage">Manage</Link>}
+					{availableSections.analytics && <Link href="/app/analytics">Analytics</Link>}
 					<button onClick={() => void signOut()}>Sign out</button>
 				</nav>
 			</header>

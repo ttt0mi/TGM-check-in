@@ -1,8 +1,17 @@
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PrintableQr } from "@/features/admin/PrintableQr";
+import { Unavailable } from "@/features/shared/Unavailable";
+import { frontendEnabled } from "@/lib/feature-flags";
 
 export default async function QrPage({ params }: { params: Promise<{ id: string }> }) {
+	if (!frontendEnabled("admin"))
+		return (
+			<Unavailable
+				title="QR management is unavailable"
+				detail="Please contact your organization administrator."
+			/>
+		);
 	const supabase = await createClient();
 	const {
 		data: { user },

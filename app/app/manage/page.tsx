@@ -2,9 +2,13 @@ import { notFound, redirect } from "next/navigation";
 import { frontendEnabled } from "@/lib/feature-flags";
 import { createClient } from "@/lib/supabase/server";
 import { Management } from "@/features/admin/Management";
+import { Unavailable } from "@/features/shared/Unavailable";
 
 export default async function ManagePage() {
-	if (!frontendEnabled("admin")) notFound();
+	if (!frontendEnabled("admin"))
+		return (
+			<Unavailable title="Management is unavailable" detail="Please contact your organization administrator." />
+		);
 	const supabase = await createClient();
 	const {
 		data: { user },
