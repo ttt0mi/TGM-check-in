@@ -24,7 +24,9 @@ export default async function ManagePage() {
 		supabase.from("organizations").select("id,name,is_active").eq("id", profile.organization_id).single(),
 		supabase
 			.from("locations")
-			.select("id,name,timezone,public_slug,is_active,auto_close_enabled,auto_close_local_time,address")
+			.select(
+				"id,name,timezone,public_slug,is_active,auto_close_enabled,auto_close_local_time,address,reception_overdue_minutes,host_overdue_minutes,admission_overdue_minutes",
+			)
 			.eq("organization_id", profile.organization_id)
 			.order("name"),
 		supabase

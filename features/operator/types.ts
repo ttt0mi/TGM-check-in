@@ -11,6 +11,9 @@ export type Branch = Pick<
 	| "auto_close_enabled"
 	| "auto_close_local_time"
 	| "address"
+	| "reception_overdue_minutes"
+	| "host_overdue_minutes"
+	| "admission_overdue_minutes"
 >;
 export type Department = Pick<Database["public"]["Tables"]["departments"]["Row"], "id" | "name" | "is_active">;
 export type Staff = Pick<

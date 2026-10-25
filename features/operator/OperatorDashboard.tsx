@@ -6,11 +6,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
 import { AssistedForm } from "./AssistedForm";
-import { VisitActions } from "./VisitActions";
-import { VisitDetails } from "./VisitDetails";
+import { VisitQueue } from "./VisitQueue";
 import { useVisits } from "./useVisits";
 import { useAccessWatch } from "./useAccessWatch";
-import type { Branch, Department, Staff, Visit } from "./types";
+import type { Branch, Department, Staff } from "./types";
 import styles from "./operator.module.css";
 
 type Props = {
@@ -18,7 +17,6 @@ type Props = {
 	role: "admin" | "receptionist";
 	availableSections: { admin: boolean; analytics: boolean };
 	branches: Branch[];
-	initialVisits: Visit[];
 	departments: Department[];
 	staff: Staff[];
 };
@@ -39,22 +37,14 @@ export function OperatorDashboard(props: Props) {
 	);
 }
 
-function DashboardContent({
-	organization,
-	role,
-	availableSections,
-	branches,
-	initialVisits,
-	departments,
-	staff,
-}: Props) {
+function DashboardContent({ organization, role, availableSections, branches, departments, staff }: Props) {
 	const router = useRouter();
 	const [branchId, setBranchId] = useState(branches[0]?.id ?? "");
 	const [showAssisted, setShowAssisted] = useState(false);
-	const [expandedVisitId, setExpandedVisitId] = useState<string | null>(null);
+	const [search, setSearch] = useState("");
 	const branch = branches.find((item) => item.id === branchId);
-	useAccessWatch({ role, organizationId: organization.id, branchId });
-	const visits = useVisits(branchId || null, branches[0]?.id ?? null, initialVisits);
+	const access = useAccessWatch({ role, organizationId: organization.id, branchId });
+	const visits = useVisits(branchId || null, search);
 
 	async function signOut() {
 		await createClient().auth.signOut({ scope: "local" });
@@ -76,6 +66,12 @@ function DashboardContent({
 				</nav>
 			</header>
 			<div className={styles.content}>
+				{access.degraded && (
+					<p role="status" className={styles.connection}>
+						Access check temporarily unavailable. Existing data may be stale; actions still require server
+						approval.
+					</p>
+				)}
 				<div className={styles.heading}>
 					<div>
 						<p>Reception</p>
@@ -108,61 +104,20 @@ function DashboardContent({
 								staff={staff.filter((item) => item.location_id === branch.id)}
 								onCreated={() => {
 									setShowAssisted(false);
-									void visits.refetch();
+									void visits.refresh();
 								}}
 							/>
 						)}
-						{visits.isPending ? (
-							<p>Loading visits…</p>
-						) : visits.error ? (
-							<p role="alert">
-								Unable to load visits. <button onClick={() => void visits.refetch()}>Retry</button>
-							</p>
-						) : (
-							<div className={styles.visitList}>
-								{visits.data?.length ? (
-									visits.data.map((visit) => (
-										<article key={visit.id} className={styles.visit}>
-											<div>
-												<strong>
-													{visit.visitor_preferred_name || visit.visitor_full_name}
-												</strong>
-												<span>{visit.status.replaceAll("_", " ")}</span>
-											</div>
-											<p>
-												{visit.visit_type} ·{" "}
-												{new Intl.DateTimeFormat(undefined, {
-													timeZone: branch?.timezone,
-													dateStyle: "medium",
-													timeStyle: "short",
-												}).format(new Date(visit.arrived_at))}
-											</p>
-											<p>{visit.purpose}</p>
-											<VisitActions visit={visit} role={role} />
-											<button
-												className={styles.detailsButton}
-												onClick={() =>
-													setExpandedVisitId(expandedVisitId === visit.id ? null : visit.id)
-												}
-											>
-												{expandedVisitId === visit.id ? "Hide details" : "Details and history"}
-											</button>
-											{expandedVisitId === visit.id && (
-												<VisitDetails
-													visit={visit}
-													departments={departments}
-													staff={staff.filter(
-														(item) => item.location_id === visit.location_id,
-													)}
-													timezone={branch?.timezone ?? "UTC"}
-												/>
-											)}
-										</article>
-									))
-								) : (
-									<p>No visits for this branch yet.</p>
-								)}
-							</div>
+						{branch && (
+							<VisitQueue
+								key={branch.id}
+								queue={visits}
+								branch={branch}
+								role={role}
+								departments={departments}
+								staff={staff}
+								onSearchChange={setSearch}
+							/>
 						)}
 					</>
 				) : (

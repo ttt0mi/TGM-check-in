@@ -67,14 +67,14 @@ isOneToOne: false
                   ]
                 },"locations": {
                   Row: {
-                    "address": string,"auto_close_enabled": boolean,"auto_close_local_time": string | null,"created_at": string,"id": string,"is_active": boolean,"name": string,"organization_id": string,"public_slug": string,"timezone": string,"updated_at": string
+                    "address": string,"admission_overdue_minutes": number,"auto_close_enabled": boolean,"auto_close_local_time": string | null,"created_at": string,"host_overdue_minutes": number,"id": string,"is_active": boolean,"name": string,"organization_id": string,"public_slug": string,"reception_overdue_minutes": number,"timezone": string,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "address"?: string,"auto_close_enabled"?: boolean,"auto_close_local_time"?: string | null,"created_at"?: string,"id"?: string,"is_active"?: boolean,"name": string,"organization_id": string,"public_slug"?: string,"timezone"?: string,"updated_at"?: string
+                    "address"?: string,"admission_overdue_minutes"?: number,"auto_close_enabled"?: boolean,"auto_close_local_time"?: string | null,"created_at"?: string,"host_overdue_minutes"?: number,"id"?: string,"is_active"?: boolean,"name": string,"organization_id": string,"public_slug"?: string,"reception_overdue_minutes"?: number,"timezone"?: string,"updated_at"?: string
                   }
                   Update: {
-                    "address"?: string,"auto_close_enabled"?: boolean,"auto_close_local_time"?: string | null,"created_at"?: string,"id"?: string,"is_active"?: boolean,"name"?: string,"organization_id"?: string,"public_slug"?: string,"timezone"?: string,"updated_at"?: string
+                    "address"?: string,"admission_overdue_minutes"?: number,"auto_close_enabled"?: boolean,"auto_close_local_time"?: string | null,"created_at"?: string,"host_overdue_minutes"?: number,"id"?: string,"is_active"?: boolean,"name"?: string,"organization_id"?: string,"public_slug"?: string,"reception_overdue_minutes"?: number,"timezone"?: string,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -385,6 +385,43 @@ isOneToOne: false
               "email": string,"is_active": boolean,"location_id": string,"role": Database["public"]['Enums']["tgm_operator_role"],"user_id": string
             }[]
                            },
+"tgm_list_visit_queue":
+{ Args: { "p_after_arrived_at"?: string,"p_after_id"?: string,"p_location_id": string,"p_page_size"?: number,"p_search"?: string,"p_status"?: Database["public"]['Enums']["tgm_visit_status"] }; Returns: {
+              "admitted_at": string | null,
+"arrived_at": string,
+"check_in_method": Database["public"]['Enums']["tgm_check_in_method"],
+"checkout_actor_id": string | null,
+"checkout_corrected_at": string | null,
+"checkout_corrected_by": string | null,
+"checkout_correction_reason": string | null,
+"checkout_location_id": string | null,
+"checkout_method": Database["public"]['Enums']["tgm_checkout_method"] | null,
+"created_at": string,
+"department_id": string | null,
+"host_approved_at": string | null,
+"id": string,
+"location_id": string,
+"organization": string | null,
+"organization_id": string,
+"phone_number": string,
+"purpose": string,
+"reception_reviewed_at": string | null,
+"staff_id": string | null,
+"status": Database["public"]['Enums']["tgm_visit_status"],
+"submission_idempotency_key": string | null,
+"time_out": string | null,
+"updated_at": string,
+"visit_type": Database["public"]['Enums']["tgm_visit_type"],
+"visitor_email": string | null,
+"visitor_full_name": string,
+"visitor_preferred_name": string | null
+            }[]
+                          SetofOptions: {
+        from: "*"
+        to: "visits"
+        isOneToOne: false
+        isSetofReturn: true
+      } },
 "tgm_manage_operator":
 { Args: { "p_action": string,"p_actor_id": string,"p_location_id"?: string,"p_role"?: Database["public"]['Enums']["tgm_operator_role"],"p_target_id": string }; Returns: {
               "created_at": string,
@@ -470,6 +507,9 @@ isOneToOne: false
                            },
 "tgm_rotate_operator_invitation":
 { Args: { "p_actor_id": string,"p_invitation_id": string,"p_token_hash": string }; Returns: string
+                           },
+"tgm_visit_queue_counts":
+{ Args: { "p_location_id": string,"p_search"?: string }; Returns: Json
                            }
           }
           Enums: {

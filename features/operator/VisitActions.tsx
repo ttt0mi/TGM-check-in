@@ -64,9 +64,11 @@ export function VisitActions({ visit, role }: { visit: Visit; role: "admin" | "r
 				if (sent.error) setMessage("Review saved. Host email needs a retry.");
 				else setMessage("Host notified.");
 			} else setMessage("Visit updated.");
-			await queryClient.invalidateQueries({
-				queryKey: ["visits", visit.location_id],
-			});
+			await Promise.all([
+				queryClient.invalidateQueries({ queryKey: ["visit-queue", visit.location_id] }),
+				queryClient.invalidateQueries({ queryKey: ["visit-queue-counts", visit.location_id] }),
+				queryClient.invalidateQueries({ queryKey: ["visit-events", visit.id] }),
+			]);
 		} catch (cause) {
 			setMessage(cause instanceof Error ? cause.message : "Action failed.");
 		} finally {

@@ -89,6 +89,64 @@
 	display: grid;
 	gap: 12px;
 }
+.queueToolbar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: end;
+	gap: 12px;
+	margin-bottom: 8px;
+}
+.queueToolbar label {
+	display: grid;
+	gap: 5px;
+	font-size: 13px;
+	font-weight: 650;
+}
+.queueToolbar input {
+	min-height: 42px;
+	min-width: min(320px, 80vw);
+	padding: 8px;
+	border: 1px solid #9faec1;
+	border-radius: 7px;
+}
+.queueToolbar button,
+.loadMore,
+.historySection > button,
+.queueGroup button {
+	min-height: 42px;
+	padding: 8px 12px;
+	border: 1px solid #1e3858;
+	border-radius: 7px;
+	background: white;
+	color: #1e3858;
+	font-weight: 650;
+	cursor: pointer;
+}
+.connection {
+	font-size: 13px;
+	color: #46566b;
+}
+.queueGroup {
+	margin-top: 28px;
+}
+.queueGroup h2 {
+	font-size: 19px;
+}
+.queueGroup h2 span {
+	color: #46566b;
+}
+.loadMore {
+	margin-top: 14px;
+}
+.historySection {
+	margin-top: 36px;
+	border-top: 1px solid #cbd5e0;
+	padding-top: 24px;
+}
+.overdue {
+	color: #a0252d !important;
+	font-weight: 700;
+}
 .visit {
 	padding: 20px;
 	border: 1px solid #e3e8ef;

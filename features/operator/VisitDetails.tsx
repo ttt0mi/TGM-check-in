@@ -151,9 +151,11 @@ function VisitEditor({
 			setError(failure.message);
 			return;
 		}
-		await queryClient.invalidateQueries({
-			queryKey: ["visits", visit.location_id],
-		});
+		await Promise.all([
+			queryClient.invalidateQueries({ queryKey: ["visit-queue", visit.location_id] }),
+			queryClient.invalidateQueries({ queryKey: ["visit-queue-counts", visit.location_id] }),
+			queryClient.invalidateQueries({ queryKey: ["visit-events", visit.id] }),
+		]);
 		onSaved();
 	}
 	return (

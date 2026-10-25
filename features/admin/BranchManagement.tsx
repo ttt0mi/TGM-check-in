@@ -25,6 +25,11 @@ const schema = z.object({
 		}, "Enter a valid IANA time zone"),
 });
 type Values = z.infer<typeof schema>;
+const overdueSchema = schema.extend({
+	reception_overdue_minutes: z.number().int().min(1).max(1440),
+	host_overdue_minutes: z.number().int().min(1).max(1440),
+	admission_overdue_minutes: z.number().int().min(1).max(1440),
+});
 
 export function BranchManagement({ branches, onChanged }: { branches: Branch[]; onChanged: () => void }) {
 	const form = useForm<Values>({
@@ -89,10 +94,20 @@ function BranchEditor({ branch, onChanged }: { branch: Branch; onChanged: () => 
 	const [timezone, setTimezone] = useState(branch.timezone);
 	const [autoClose, setAutoClose] = useState(branch.auto_close_enabled);
 	const [autoCloseTime, setAutoCloseTime] = useState(branch.auto_close_local_time ?? "17:00");
+	const [receptionOverdue, setReceptionOverdue] = useState(branch.reception_overdue_minutes);
+	const [hostOverdue, setHostOverdue] = useState(branch.host_overdue_minutes);
+	const [admissionOverdue, setAdmissionOverdue] = useState(branch.admission_overdue_minutes);
 	const [error, setError] = useState("");
 	async function save(event: React.FormEvent) {
 		event.preventDefault();
-		const parsed = schema.safeParse({ name, address, timezone });
+		const parsed = overdueSchema.safeParse({
+			name,
+			address,
+			timezone,
+			reception_overdue_minutes: receptionOverdue,
+			host_overdue_minutes: hostOverdue,
+			admission_overdue_minutes: admissionOverdue,
+		});
 		if (!parsed.success) {
 			setError(parsed.error.issues[0]?.message ?? "Invalid branch details");
 			return;
@@ -153,6 +168,36 @@ function BranchEditor({ branch, onChanged }: { branch: Branch; onChanged: () => 
 						/>
 					</label>
 				)}
+				<label>
+					Reception review overdue after (minutes)
+					<input
+						type="number"
+						min="1"
+						max="1440"
+						value={receptionOverdue}
+						onChange={(event) => setReceptionOverdue(Number(event.target.value))}
+					/>
+				</label>
+				<label>
+					Host response overdue after (minutes)
+					<input
+						type="number"
+						min="1"
+						max="1440"
+						value={hostOverdue}
+						onChange={(event) => setHostOverdue(Number(event.target.value))}
+					/>
+				</label>
+				<label>
+					Admission overdue after (minutes)
+					<input
+						type="number"
+						min="1"
+						max="1440"
+						value={admissionOverdue}
+						onChange={(event) => setAdmissionOverdue(Number(event.target.value))}
+					/>
+				</label>
 				<button>Save</button>
 			</form>
 			<button onClick={() => void setActive(!branch.is_active)}>
