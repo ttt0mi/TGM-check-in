@@ -446,6 +446,9 @@ isOneToOne: false
 "tgm_prepare_host_email":
 { Args: { "p_actor_id": string,"p_idempotency_key": string,"p_token_hash": string,"p_visit_id": string }; Returns: string
                            },
+"tgm_preview_host_decision":
+{ Args: { "p_token_hash": string }; Returns: Json
+                           },
 "tgm_preview_operator_invitation":
 { Args: { "p_actor_id": string,"p_token_hash": string }; Returns: {
               "branch_name": string,"expires_at": string,"invited_email": string,"invited_role": Database["public"]['Enums']["tgm_operator_role"],"organization_name": string,"state": string

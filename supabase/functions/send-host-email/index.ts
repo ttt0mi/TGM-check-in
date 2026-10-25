@@ -10,24 +10,9 @@ import {
 	uuid,
 } from "../_shared/tgm.ts";
 import type { Database } from "../_shared/database.ts";
-import { appOrigin } from "../_shared/invitation-email.ts";
-
-function safeOrigin(): string {
-	return appOrigin();
-}
-
-function htmlEscape(value: string): string {
-	return value.replace(
-		/[&<>"']/g,
-		character => ({
-				"&": "&amp;",
-				"<": "&lt;",
-				">": "&gt;",
-				'"': "&quot;",
-				"'": "&#39;",
-			})[character]!,
-	);
-}
+import { appOrigin } from "../_shared/app-origin.ts";
+import { htmlEscape } from "../_shared/email-format.ts";
+import { sendTransactionalEmail } from "../_shared/email-transport.ts";
 
 export default {
 	fetch: withSupabase<Database>({ auth: "user" }, async (req, ctx) => {
@@ -49,7 +34,7 @@ export default {
 
 			// Missing deployment configuration must never create an attempt or send a
 			// link to an unhosted page. This is intentionally fail-closed for launch.
-			const origin = safeOrigin();
+			const origin = appOrigin();
 			const apiKey = env("RESEND_API_KEY");
 			const from = env("RESEND_FROM_EMAIL");
 			if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(from))
@@ -141,32 +126,21 @@ export default {
 					`<p>Arrival: ${htmlEscape(arrival)}</p>` +
 					`<p><a href="${htmlEscape(decisionUrl.toString())}">Acknowledge or decline this visit</a></p>` +
 					"<p>This single-use link expires at the end of the visit day. Reception must still admit the visitor after approval.</p>",
+				text: `Visitor: ${visit.visitor_full_name}\nVisit type: ${visit.visit_type}\nPurpose: ${visit.purpose}\nArrival: ${arrival}\n\nAcknowledge or decline this visit: ${decisionUrl.toString()}\n\nThis single-use link expires at the end of the visit day. Reception must still admit the visitor after approval.`,
 			};
 			try {
 				// Once the request starts, a timeout or server failure is ambiguous.
 				providerStatus = "unknown";
 				errorCode = "provider_outcome_unknown";
-				const response = await fetch("https://api.resend.com/emails", {
-					method: "POST",
-					headers: {
-						Authorization: `Bearer ${apiKey}`,
-						"Content-Type": "application/json",
-						"Idempotency-Key": `tgm-host-${idempotencyKey}`,
-					},
-					body: JSON.stringify(emailBody),
-				});
-				const result = (await response.json()) as { id?: string };
-				if (response.ok && result.id) {
+				const delivery = await sendTransactionalEmail(apiKey, emailBody, `tgm-host-${idempotencyKey}`);
+				if (delivery.status === "sent") {
 					providerStatus = "sent";
-					providerId = result.id;
+					providerId = delivery.providerId;
 					errorCode = null;
 				} else {
-					// A non-success response does not prove the provider did not accept
-					// the message. Preserve the token and block automatic resends.
-					errorCode = `resend_http_${response.status}`;
+					errorCode = delivery.errorCode;
 				}
-			} catch (error) {
-				console.error("Resend request outcome unknown", error);
+			} catch {
 				errorCode = "provider_outcome_unknown";
 			}
 			const { error: finishError } = await operator.service.rpc(

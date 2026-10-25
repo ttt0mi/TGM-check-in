@@ -108,12 +108,20 @@ test("clock swipes through the three views in both directions", async ({ page })
 	await expect(page.getByRole("button", { name: "24-hour" })).toHaveAttribute("aria-pressed", "true");
 });
 
-test("host decision token is removed from the address bar", async ({ page }) => {
+test("host preview survives refresh and requires confirmation", async ({ page, request }) => {
+	await request.post("http://127.0.0.1:54331/__test/host-decision-reset");
 	await page.goto(`/host-decision#token=${"a".repeat(64)}`);
+	await expect(page.getByText("Host Visitor")).toBeVisible();
 	await expect(page.getByRole("button", { name: "Approve visit" })).toBeVisible();
 	await expect(page).toHaveURL(/\/host-decision$/);
+	await page.reload();
+	await expect(page.getByText("Host Visitor")).toBeVisible();
 	await page.getByRole("button", { name: "Approve visit" }).click();
+	await expect(page.getByText("Approve this visitor request?")).toBeVisible();
+	await page.getByRole("button", { name: "Confirm approval" }).click();
 	await expect(page.getByText("Approved. Reception will admit the visitor.")).toBeVisible();
+	await page.reload();
+	await expect(page.getByText("This decision link is invalid.")).toBeVisible();
 });
 
 test("home routes into the new account flow", async ({ page }) => {

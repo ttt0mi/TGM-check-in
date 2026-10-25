@@ -52,19 +52,20 @@ export default {
 			}
 			let status: "sent" | "unknown" = "unknown";
 			let providerId: string | null = null;
+			let errorCode = "provider_outcome_unknown";
 			try {
-				providerId = await sendInvitationEmail(emailConfig, {
+				const delivery = await sendInvitationEmail(emailConfig, {
 					invitationId: data, token, email, organization: organization.name,
 					role, branch: branchName,
 				});
-				status = "sent";
-			} catch (sendError) {
-				console.error("Invitation email outcome unknown", sendError);
-			}
+				status = delivery.status;
+				if (delivery.status === "sent") providerId = delivery.providerId;
+				else errorCode = delivery.errorCode;
+			} catch { /* A formatting failure after token creation remains unknown. */ }
 			const { error: deliveryError } = await operator.service.rpc(
 				"tgm_mark_operator_invitation_delivery" as never,
 				{ p_invitation_id: data, p_status: status, p_provider_id: providerId,
-					p_error: status === "unknown" ? "provider_outcome_unknown" : null } as never,
+					p_error: status === "unknown" ? errorCode : null } as never,
 			);
 			if (deliveryError) throw deliveryError;
 			if (status !== "sent") throw new HttpError(503, "Invitation created; email outcome is uncertain. Review before resending.");

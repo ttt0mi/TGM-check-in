@@ -46,16 +46,19 @@ export default {
       if (rotateError) throw new HttpError(409, rotateError.message);
       let status: "sent" | "unknown" = "unknown";
       let providerId: string | null = null;
+	  let errorCode = "provider_outcome_unknown";
       try {
-        providerId = await sendInvitationEmail(config, {
+        const delivery = await sendInvitationEmail(config, {
           invitationId, token, email: invitation.email, organization: organization.name,
           role: invitation.role, branch: branchName,
         });
-        status = "sent";
-      } catch (sendError) { console.error("Invitation resend outcome unknown", sendError); }
+        status = delivery.status;
+		if (delivery.status === "sent") providerId = delivery.providerId;
+		else errorCode = delivery.errorCode;
+      } catch { /* A formatting failure after rotation remains unknown. */ }
       const { error: markError } = await operator.service.rpc("tgm_mark_operator_invitation_delivery" as never,
         { p_invitation_id: invitationId, p_status: status, p_provider_id: providerId,
-          p_error: status === "unknown" ? "provider_outcome_unknown" : null } as never);
+          p_error: status === "unknown" ? errorCode : null } as never);
       if (markError) throw markError;
       if (status !== "sent") throw new HttpError(503, "Email outcome is uncertain. Review before resending.");
       return json({ invitation_id: invitationId, delivery_status: status, expires_in_days: 7 });

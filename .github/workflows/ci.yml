@@ -101,11 +101,11 @@ jobs:
 
             - name: Check Edge Functions
               working-directory: supabase/functions
-              run: deno check get-public-directory/index.ts submit-public-visit/index.ts get-visitor-visit/index.ts respond-to-host-visit/index.ts register-organization/index.ts organization-signup-availability/index.ts create-branch/index.ts invite-operator/index.ts accept-operator-invite/index.ts get-operator-invitation-preview/index.ts manage-operator/index.ts operator-directory/index.ts manage-operator-invitation/index.ts create-assisted-visit/index.ts reception-visit-action/index.ts send-host-email/index.ts get-visit-analytics/index.ts export-visit-report/index.ts
+              run: deno check get-public-directory/index.ts submit-public-visit/index.ts get-visitor-visit/index.ts respond-to-host-visit/index.ts get-host-decision-preview/index.ts register-organization/index.ts organization-signup-availability/index.ts create-branch/index.ts invite-operator/index.ts accept-operator-invite/index.ts get-operator-invitation-preview/index.ts manage-operator/index.ts operator-directory/index.ts manage-operator-invitation/index.ts create-assisted-visit/index.ts reception-visit-action/index.ts send-host-email/index.ts get-visit-analytics/index.ts export-visit-report/index.ts
 
             - name: Run Edge Function tests
               working-directory: supabase/functions
-              run: deno test _shared/tgm_test.ts _shared/reporting_test.ts create-branch/validation_test.ts
+              run: deno test _shared/tgm_test.ts _shared/reporting_test.ts _shared/email-transport_test.ts create-branch/validation_test.ts
 
             - name: Run database regressions
               run: |
@@ -114,7 +114,8 @@ jobs:
                     supabase/tests/tenant_isolation.sql \
                     supabase/tests/visit_lifecycle_accountability.sql \
                     supabase/tests/operator_invitation_delivery.sql \
-                    supabase/tests/public_privacy_notice.sql; do
+                    supabase/tests/public_privacy_notice.sql \
+                    supabase/tests/host_decision_preview.sql; do
                     docker exec -i supabase_db_TGM-check-in \
                       psql -U postgres -d postgres -v ON_ERROR_STOP=1 < "$test_file" || exit 1
                   done

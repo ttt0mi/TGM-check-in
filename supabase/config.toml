@@ -83,6 +83,9 @@ verify_jwt = false
 [functions.respond-to-host-visit]
 verify_jwt = false
 
+[functions.get-host-decision-preview]
+verify_jwt = false
+
 [functions.get-visitor-visit]
 verify_jwt = false
 
