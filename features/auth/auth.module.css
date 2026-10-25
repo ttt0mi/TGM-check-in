@@ -44,6 +44,24 @@
 	font-weight: 700;
 	cursor: pointer;
 }
+.card button.secondary {
+	min-height: 36px;
+	padding: 4px 8px;
+	border: 1px solid #1e3858;
+	background: white;
+	color: #1e3858;
+}
+.requirements {
+	margin: 0;
+	padding-left: 20px;
+	font-size: 13px;
+}
+.requirements li[data-met="true"] {
+	color: #17643a;
+}
+.requirements li[data-met="true"]::marker {
+	content: "✓ ";
+}
 .card small {
 	color: #ae2836;
 }

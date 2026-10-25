@@ -16,5 +16,13 @@ export default async function CreateOrganizationPage() {
 		.eq("user_id", user.id)
 		.maybeSingle();
 	if (profile?.organization_id) redirect("/start");
-	return <CreateOrganization />;
+	const { data: availability, error: availabilityError } = await supabase.functions.invoke(
+		"organization-signup-availability",
+		{ method: "GET" },
+	);
+	return (
+		<CreateOrganization
+			availability={availabilityError ? "error" : availability?.available === true ? "open" : "disabled"}
+		/>
+	);
 }

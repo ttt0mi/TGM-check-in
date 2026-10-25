@@ -101,7 +101,7 @@ jobs:
 
             - name: Check Edge Functions
               working-directory: supabase/functions
-              run: deno check get-public-directory/index.ts submit-public-visit/index.ts get-visitor-visit/index.ts respond-to-host-visit/index.ts register-organization/index.ts create-branch/index.ts invite-operator/index.ts accept-operator-invite/index.ts manage-operator/index.ts operator-directory/index.ts manage-operator-invitation/index.ts create-assisted-visit/index.ts reception-visit-action/index.ts send-host-email/index.ts get-visit-analytics/index.ts export-visit-report/index.ts
+              run: deno check get-public-directory/index.ts submit-public-visit/index.ts get-visitor-visit/index.ts respond-to-host-visit/index.ts register-organization/index.ts organization-signup-availability/index.ts create-branch/index.ts invite-operator/index.ts accept-operator-invite/index.ts get-operator-invitation-preview/index.ts manage-operator/index.ts operator-directory/index.ts manage-operator-invitation/index.ts create-assisted-visit/index.ts reception-visit-action/index.ts send-host-email/index.ts get-visit-analytics/index.ts export-visit-report/index.ts
 
             - name: Run Edge Function tests
               working-directory: supabase/functions

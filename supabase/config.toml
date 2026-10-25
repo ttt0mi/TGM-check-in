@@ -103,6 +103,9 @@ verify_jwt = true
 [functions.register-organization]
 verify_jwt = true
 
+[functions.organization-signup-availability]
+verify_jwt = true
+
 [functions.create-branch]
 verify_jwt = true
 
@@ -110,6 +113,9 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.accept-operator-invite]
+verify_jwt = true
+
+[functions.get-operator-invitation-preview]
 verify_jwt = true
 
 [functions.operator-directory]
@@ -217,10 +223,13 @@ site_url = "https://reception.tgmeducation.net"
 additional_redirect_urls = [
   "https://reception.tgmeducation.net/auth/callback",
   "https://reception.tgmeducation.net/auth/callback?next=/reset-password",
+  "https://reception.tgmeducation.net/auth/recover",
   "http://localhost:3000/auth/callback",
   "http://localhost:3000/auth/callback?next=/reset-password",
+  "http://localhost:3000/auth/recover",
   "http://127.0.0.1:3000/auth/callback",
   "http://127.0.0.1:3000/auth/callback?next=/reset-password",
+  "http://127.0.0.1:3000/auth/recover",
 ]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
@@ -308,6 +317,10 @@ sender_name = "Reception"
 # [auth.email.template.invite]
 # subject = "You have been invited"
 # content_path = "./supabase/templates/invite.html"
+
+[auth.email.template.recovery]
+subject = "Reset your TGM password"
+content_path = "./supabase/templates/recovery.html"
 
 # Uncomment to customize notification email template
 # [auth.email.notification.password_changed]

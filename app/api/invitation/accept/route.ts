@@ -21,6 +21,6 @@ export async function POST(request: NextRequest) {
 	const response = NextResponse.json(error ? { error: "Invitation could not be accepted" } : data, {
 		status: error ? 409 : 200,
 	});
-	response.cookies.delete("tgm_invitation");
+	if (!error) response.cookies.delete("tgm_invitation");
 	return response;
 }

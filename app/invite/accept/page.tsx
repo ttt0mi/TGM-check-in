@@ -10,5 +10,5 @@ export default async function AcceptInvitePage() {
 	} = await supabase.auth.getUser();
 	if (!user) redirect("/login");
 	if (!user.email_confirmed_at) redirect("/verify-email");
-	return <AcceptInvite />;
+	return <AcceptInvite accountEmail={user.email ?? ""} />;
 }
