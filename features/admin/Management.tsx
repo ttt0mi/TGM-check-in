@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
 import type { Branch, Department, Staff } from "@/features/operator/types";
 import { OrganizationSettings } from "./OrganizationSettings";
 import { BranchManagement } from "./BranchManagement";
@@ -11,12 +10,14 @@ import { AccessManagement } from "./AccessManagement";
 import styles from "./admin.module.css";
 
 export function Management({
+	tab,
 	organization,
 	privacyNotice,
 	branches,
 	departments,
 	staff,
 }: {
+	tab: "organization" | "branches" | "directory" | "access";
 	organization: { id: string; name: string; is_active: boolean };
 	privacyNotice: { notice_copy: string; policy_url: string; approved_at: string; approved_by: string } | null;
 	branches: Branch[];
@@ -24,7 +25,6 @@ export function Management({
 	staff: Staff[];
 }) {
 	const router = useRouter();
-	const [tab, setTab] = useState<"organization" | "branches" | "directory" | "access">("organization");
 	const refresh = () => router.refresh();
 	return (
 		<main id="main-content" className={styles.page}>
@@ -34,9 +34,9 @@ export function Management({
 			</header>
 			<nav aria-label="Management sections">
 				{(["organization", "branches", "directory", "access"] as const).map((name) => (
-					<button key={name} aria-current={tab === name ? "page" : undefined} onClick={() => setTab(name)}>
+					<Link key={name} href={`/app/manage?tab=${name}`} aria-current={tab === name ? "page" : undefined}>
 						{name}
-					</button>
+					</Link>
 				))}
 			</nav>
 			{tab === "organization" && (

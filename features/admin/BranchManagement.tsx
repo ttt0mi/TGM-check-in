@@ -11,7 +11,7 @@ import styles from "./admin.module.css";
 
 const schema = z.object({
 	name: z.string().trim().min(1).max(120),
-	address: z.string().trim().max(240),
+	address: z.string().trim().min(1, "Enter a branch address").max(240),
 	timezone: z
 		.string()
 		.min(1)
@@ -43,7 +43,7 @@ export function BranchManagement({ branches, onChanged }: { branches: Branch[]; 
 			body: values,
 		});
 		if (error) {
-			setMessage(error.message);
+			setMessage("Unable to create this branch. Check the details and retry.");
 			return;
 		}
 		form.reset();
@@ -58,12 +58,12 @@ export function BranchManagement({ branches, onChanged }: { branches: Branch[]; 
 					Name <input {...form.register("name")} />
 				</label>
 				<label>
-					Address <input {...form.register("address")} />
+					Address <input required {...form.register("address")} />
 				</label>
 				<label>
 					Time zone <input {...form.register("timezone")} placeholder="Africa/Lagos" />
 				</label>
-				<button disabled={form.formState.isSubmitting}>Create branch</button>
+				<button disabled={form.formState.isSubmitting}>{form.formState.isSubmitting ? "Creating…" : "Create branch"}</button>
 			</form>
 			{Object.values(form.formState.errors).map((error, index) => (
 				<p className={styles.error} key={index}>
@@ -98,8 +98,16 @@ function BranchEditor({ branch, onChanged }: { branch: Branch; onChanged: () => 
 	const [hostOverdue, setHostOverdue] = useState(branch.host_overdue_minutes);
 	const [admissionOverdue, setAdmissionOverdue] = useState(branch.admission_overdue_minutes);
 	const [error, setError] = useState("");
+	const [savedMessage, setSavedMessage] = useState("");
+	const [saving, setSaving] = useState(false);
+	const [activePending, setActivePending] = useState(false);
 	async function save(event: React.FormEvent) {
 		event.preventDefault();
+		setSavedMessage("");
+		if (autoClose && !/^([01]\d|2[0-3]):[0-5]\d$/.test(autoCloseTime.slice(0, 5))) {
+			setError("Choose a valid local auto-close time.");
+			return;
+		}
 		const parsed = overdueSchema.safeParse({
 			name,
 			address,
@@ -112,6 +120,7 @@ function BranchEditor({ branch, onChanged }: { branch: Branch; onChanged: () => 
 			setError(parsed.error.issues[0]?.message ?? "Invalid branch details");
 			return;
 		}
+		setSaving(true);
 		const { error: failure } = await createClient()
 			.from("locations")
 			.update({
@@ -120,22 +129,55 @@ function BranchEditor({ branch, onChanged }: { branch: Branch; onChanged: () => 
 				auto_close_local_time: autoClose ? autoCloseTime : null,
 			})
 			.eq("id", branch.id);
+		setSaving(false);
 		if (failure) {
-			setError(failure.message);
+			setError("Unable to save branch details. Check the values and retry.");
 			return;
 		}
 		setError("");
+		setSavedMessage("Branch details saved.");
 		onChanged();
 	}
 	async function setActive(active: boolean) {
+		const supabase = createClient();
+		if (!active) {
+			const { count, error: preflightError } = await supabase
+				.from("visits")
+				.select("id", { count: "exact", head: true })
+				.eq("location_id", branch.id)
+				.in("status", [
+					"pending_reception_review",
+					"pending_host_acknowledgement",
+					"host_approved_awaiting_reception",
+					"approved_on_site",
+				]);
+			if (preflightError) {
+				setError("Unable to check active visits. Please retry.");
+				return;
+			}
+			if (count) {
+				setError(`Resolve ${count} active visit(s) before deactivating ${branch.name}.`);
+				return;
+			}
+		}
+		if (
+			!window.confirm(
+				`${active ? "Reactivate" : "Deactivate"} ${branch.name}? ${active ? "Public check-in will become available if privacy content is approved." : "New check-ins at this branch will stop."}`,
+			)
+		)
+			return;
+		setActivePending(true);
 		const { error: failure } = await createClient()
 			.from("locations")
 			.update({ is_active: active })
 			.eq("id", branch.id);
 		if (failure) {
-			setError(failure.message);
+			setError("Unable to change branch availability. Check for active visits and retry.");
+			setActivePending(false);
 			return;
 		}
+		setError("");
+		setActivePending(false);
 		onChanged();
 	}
 	return (
@@ -160,14 +202,16 @@ function BranchEditor({ branch, onChanged }: { branch: Branch; onChanged: () => 
 				</label>
 				{autoClose && (
 					<label>
-						Local time{" "}
+						Auto-close time in {timezone}{" "}
 						<input
 							type="time"
+							required
 							value={autoCloseTime.slice(0, 5)}
 							onChange={(event) => setAutoCloseTime(event.target.value)}
 						/>
 					</label>
 				)}
+				<p>Auto-close runs on the configured schedule in {timezone}; processing may occur after the selected minute.</p>
 				<label>
 					Reception review overdue after (minutes)
 					<input
@@ -198,16 +242,22 @@ function BranchEditor({ branch, onChanged }: { branch: Branch; onChanged: () => 
 						onChange={(event) => setAdmissionOverdue(Number(event.target.value))}
 					/>
 				</label>
-				<button>Save</button>
+				<button disabled={saving}>{saving ? "Saving…" : "Save"}</button>
 			</form>
-			<button onClick={() => void setActive(!branch.is_active)}>
+			<button disabled={activePending} onClick={() => void setActive(!branch.is_active)}>
 				{branch.is_active ? "Deactivate" : "Reactivate"}
 			</button>
+			{error.includes("active visit") && (
+				<p>
+					<Link href={`/app?branch=${branch.id}`}>Open this branch’s reception queue</Link>
+				</p>
+			)}
 			{error && (
 				<p role="alert" className={styles.error}>
 					{error}
 				</p>
 			)}
+			{savedMessage && <p role="status">{savedMessage}</p>}
 		</>
 	);
 }

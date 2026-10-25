@@ -54,6 +54,7 @@ export function VisitDetails({
 				<dd>
 					{staff.find((item) => item.id === visit.staff_id)?.preferred_name ||
 						staff.find((item) => item.id === visit.staff_id)?.full_name ||
+						visit.host_display_name_at_assignment ||
 						"None"}
 				</dd>
 			</dl>
@@ -66,15 +67,27 @@ export function VisitDetails({
 				<VisitEditor visit={visit} departments={departments} staff={staff} onSaved={() => setEditing(false)} />
 			)}
 			<h3>History</h3>
+			{events.error && events.data && (
+				<p role="alert">
+					History may be out of date. <button onClick={() => void events.refetch()}>Retry history</button>
+				</p>
+			)}
 			{events.isPending ? (
 				<p>Loading history…</p>
-			) : events.error ? (
-				<p role="alert">Unable to load history.</p>
+			) : events.error && !events.data ? (
+				<p role="alert">
+					Unable to load history. <button onClick={() => void events.refetch()}>Retry history</button>
+				</p>
 			) : (
 				<ol>
 					{events.data?.map((event) => (
 						<li key={event.id}>
-							<strong>{event.event_type.replaceAll("_", " ")}</strong> ·{" "}
+							<strong>
+								{event.event_type === "visit_edited"
+									? "Visit details edited"
+									: event.event_type.replaceAll("_", " ")}
+							</strong>{" "}
+							·{" "}
 							{new Intl.DateTimeFormat(undefined, {
 								timeZone: timezone,
 								dateStyle: "medium",

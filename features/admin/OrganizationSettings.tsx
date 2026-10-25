@@ -15,17 +15,21 @@ export function OrganizationSettings({
 }) {
 	const [name, setName] = useState(organization.name);
 	const [message, setMessage] = useState("");
+	const [savingName, setSavingName] = useState(false);
 	const [noticeCopy, setNoticeCopy] = useState(privacyNotice?.notice_copy ?? "");
 	const [policyUrl, setPolicyUrl] = useState(privacyNotice?.policy_url ?? "");
 	const [approved, setApproved] = useState(false);
 	const [savingNotice, setSavingNotice] = useState(false);
 	async function save(event: React.FormEvent) {
 		event.preventDefault();
+		if (!name.trim() || name.trim().length > 120) { setMessage("Enter an organization name of at most 120 characters."); return; }
+		setSavingName(true);
 		const { error } = await createClient()
 			.from("organizations")
 			.update({ name: name.trim() })
 			.eq("id", organization.id);
-		setMessage(error ? error.message : "Organization name saved.");
+		setSavingName(false);
+		setMessage(error ? "Unable to save the organization name. Please retry." : "Organization name saved.");
 		if (!error) onChanged();
 	}
 	async function saveNotice(event: React.FormEvent) {
@@ -51,12 +55,13 @@ export function OrganizationSettings({
 	return (
 		<section className={styles.section}>
 			<h2>Organization</h2>
+			<p>Only the organization name and approved public privacy notice can be edited here.</p>
 			<form onSubmit={(event) => void save(event)} className={styles.form}>
 				<label>
 					Name{" "}
 					<input maxLength={120} required value={name} onChange={(event) => setName(event.target.value)} />
 				</label>
-				<button>Save name</button>
+				<button disabled={savingName}>{savingName ? "Saving…" : "Save name"}</button>
 			</form>
 			{message && <p role="status">{message}</p>}
 			<h2>Public check-in privacy notice</h2>

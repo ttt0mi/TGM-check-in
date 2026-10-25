@@ -10,14 +10,18 @@ import styles from "./operator.module.css";
 
 export function AssistedForm({
 	branchId,
+	branchName,
 	departments,
 	staff,
 	onCreated,
+	onCancel,
 }: {
 	branchId: string;
+	branchName: string;
 	departments: Department[];
 	staff: Staff[];
 	onCreated: () => void;
+	onCancel: () => void;
 }) {
 	const [idempotencyKey, setIdempotencyKey] = useState<string | null>(null);
 	const [error, setError] = useState("");
@@ -41,6 +45,7 @@ export function AssistedForm({
 	});
 
 	async function submit(values: PublicVisitValues) {
+		if (!window.confirm(`Create this visit at ${branchName}?`)) return;
 		const key = idempotencyKey ?? crypto.randomUUID();
 		setIdempotencyKey(key);
 		setError("");
@@ -71,6 +76,9 @@ export function AssistedForm({
 	return (
 		<form className={styles.form} onSubmit={form.handleSubmit(submit)} noValidate>
 			<h2>Assisted check-in</h2>
+			<p>
+				Branch: <strong>{branchName}</strong>
+			</p>
 			<label>
 				Full name <input {...form.register("visitor_full_name")} />
 			</label>
@@ -137,6 +145,16 @@ export function AssistedForm({
 				</p>
 			)}
 			<button disabled={form.formState.isSubmitting}>Create visit</button>
+			<button
+				type="button"
+				disabled={form.formState.isSubmitting}
+				onClick={() => {
+					if (!form.formState.isDirty || window.confirm(`Discard this assisted check-in for ${branchName}?`))
+						onCancel();
+				}}
+			>
+				Cancel
+			</button>
 		</form>
 	);
 }

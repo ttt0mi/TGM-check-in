@@ -1,6 +1,6 @@
 "use client";
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -17,6 +17,7 @@ type Props = {
 	role: "admin" | "receptionist";
 	availableSections: { admin: boolean; analytics: boolean };
 	branches: Branch[];
+	initialBranchId: string;
 	departments: Department[];
 	staff: Staff[];
 };
@@ -37,10 +38,60 @@ export function OperatorDashboard(props: Props) {
 	);
 }
 
-function DashboardContent({ organization, role, availableSections, branches, departments, staff }: Props) {
+function DashboardContent({
+	organization,
+	role,
+	availableSections,
+	branches: initialBranches,
+	initialBranchId,
+	departments: initialDepartments,
+	staff: initialStaff,
+}: Props) {
 	const router = useRouter();
-	const [branchId, setBranchId] = useState(branches[0]?.id ?? "");
-	const [showAssisted, setShowAssisted] = useState(false);
+	const directory = useQuery({
+		queryKey: ["operator-directory", organization.id],
+		initialData: { branches: initialBranches, departments: initialDepartments, staff: initialStaff },
+		staleTime: 0,
+		refetchOnMount: "always",
+		queryFn: async () => {
+			const supabase = createClient();
+			const [branchResult, departmentResult, staffResult] = await Promise.all([
+				supabase
+					.from("locations")
+					.select(
+						"id,name,timezone,public_slug,is_active,auto_close_enabled,auto_close_local_time,address,reception_overdue_minutes,host_overdue_minutes,admission_overdue_minutes",
+					)
+					.eq("organization_id", organization.id)
+					.eq("is_active", true)
+					.order("name"),
+				supabase
+					.from("departments")
+					.select("id,name,is_active")
+					.eq("organization_id", organization.id)
+					.eq("is_active", true)
+					.order("name"),
+				supabase
+					.from("staff")
+					.select("id,full_name,preferred_name,department_id,location_id,email,is_active")
+					.eq("organization_id", organization.id)
+					.eq("is_active", true)
+					.order("full_name"),
+			]);
+			if (branchResult.error) throw branchResult.error;
+			if (departmentResult.error) throw departmentResult.error;
+			if (staffResult.error) throw staffResult.error;
+			return {
+				branches: branchResult.data ?? [],
+				departments: departmentResult.data ?? [],
+				staff: staffResult.data ?? [],
+			};
+		},
+	});
+	const { branches, departments, staff } = directory.data;
+	const [selectedBranchId, setBranchId] = useState(initialBranchId);
+	const branchId = branches.some((item) => item.id === selectedBranchId) ? selectedBranchId : (branches[0]?.id ?? "");
+	const [assistedBranch, setAssistedBranch] = useState<Branch | null>(null);
+	const showAssisted = assistedBranch !== null;
 	const [search, setSearch] = useState("");
 	const branch = branches.find((item) => item.id === branchId);
 	const access = useAccessWatch({ role, organizationId: organization.id, branchId });
@@ -66,6 +117,12 @@ function DashboardContent({ organization, role, availableSections, branches, dep
 				</nav>
 			</header>
 			<div className={styles.content}>
+				{directory.error && (
+					<p role="status" className={styles.connection}>
+						Branch and host choices may be out of date.{" "}
+						<button onClick={() => void directory.refetch()}>Retry refresh</button>
+					</p>
+				)}
 				{access.degraded && (
 					<p role="status" className={styles.connection}>
 						Access check temporarily unavailable. Existing data may be stale; actions still require server
@@ -77,8 +134,8 @@ function DashboardContent({ organization, role, availableSections, branches, dep
 						<p>Reception</p>
 						<h1>Visits</h1>
 					</div>
-					<button onClick={() => setShowAssisted((value) => !value)} disabled={!branch}>
-						New assisted check-in
+					<button onClick={() => setAssistedBranch(branch ?? null)} disabled={!branch || showAssisted}>
+						{showAssisted ? "Assisted form open" : "New assisted check-in"}
 					</button>
 				</div>
 				{branches.length > 0 ? (
@@ -86,26 +143,36 @@ function DashboardContent({ organization, role, availableSections, branches, dep
 						<label className={styles.branchPicker}>
 							Branch
 							{role === "admin" ? (
-								<select value={branchId} onChange={(event) => setBranchId(event.target.value)}>
-									{branches.map((item) => (
-										<option key={item.id} value={item.id}>
-											{item.name}
-										</option>
-									))}
-								</select>
+								<>
+									<select
+										value={branchId}
+										onChange={(event) => setBranchId(event.target.value)}
+										disabled={showAssisted}
+									>
+										{branches.map((item) => (
+											<option key={item.id} value={item.id}>
+												{item.name}
+											</option>
+										))}
+									</select>
+									{showAssisted && <small>Close the assisted form before switching branches.</small>}
+								</>
 							) : (
 								<strong>{branch?.name}</strong>
 							)}
 						</label>
-						{showAssisted && branch && (
+						{assistedBranch && (
 							<AssistedForm
-								branchId={branch.id}
+								key={assistedBranch.id}
+								branchId={assistedBranch.id}
+								branchName={assistedBranch.name}
 								departments={departments}
-								staff={staff.filter((item) => item.location_id === branch.id)}
+								staff={staff.filter((item) => item.location_id === assistedBranch.id)}
 								onCreated={() => {
-									setShowAssisted(false);
+									setAssistedBranch(null);
 									void visits.refresh();
 								}}
+								onCancel={() => setAssistedBranch(null)}
 							/>
 						)}
 						{branch && (

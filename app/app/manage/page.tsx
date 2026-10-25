@@ -4,7 +4,12 @@ import { createClient } from "@/lib/supabase/server";
 import { Management } from "@/features/admin/Management";
 import { Unavailable } from "@/features/shared/Unavailable";
 
-export default async function ManagePage() {
+export default async function ManagePage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
+	const requestedTab = (await searchParams).tab;
+	const tab =
+		requestedTab === "branches" || requestedTab === "directory" || requestedTab === "access"
+			? requestedTab
+			: "organization";
 	if (!frontendEnabled("admin"))
 		return (
 			<Unavailable title="Management is unavailable" detail="Please contact your organization administrator." />
@@ -38,7 +43,9 @@ export default async function ManagePage() {
 			.from("staff")
 			.select("id,full_name,preferred_name,department_id,location_id,email,is_active")
 			.eq("organization_id", profile.organization_id)
-			.order("full_name"),
+			.order("full_name")
+			.order("id")
+			.range(0, 24),
 		supabase
 			.from("organization_privacy_notices")
 			.select("notice_copy,policy_url,approved_at,approved_by")
@@ -51,6 +58,7 @@ export default async function ManagePage() {
 	if (!org.data?.is_active) redirect("/suspended");
 	return (
 		<Management
+			tab={tab}
 			organization={org.data}
 			privacyNotice={privacy.data}
 			branches={branches.data ?? []}

@@ -193,14 +193,14 @@ isOneToOne: true
                   ]
                 },"staff": {
                   Row: {
-                    "created_at": string,"department_id": string,"email": string,"full_name": string,"id": string,"is_active": boolean,"location_id": string,"organization_id": string,"preferred_name": string | null,"updated_at": string
+                    "created_at": string,"department_id": string,"email": string,"full_name": string,"id": string,"is_active": boolean,"location_id": string,"organization_id": string,"person_id": string,"preferred_name": string | null,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "created_at"?: string,"department_id": string,"email": string,"full_name": string,"id"?: string,"is_active"?: boolean,"location_id": string,"organization_id": string,"preferred_name"?: string | null,"updated_at"?: string
+                    "created_at"?: string,"department_id": string,"email": string,"full_name": string,"id"?: string,"is_active"?: boolean,"location_id": string,"organization_id": string,"person_id"?: string,"preferred_name"?: string | null,"updated_at"?: string
                   }
                   Update: {
-                    "created_at"?: string,"department_id"?: string,"email"?: string,"full_name"?: string,"id"?: string,"is_active"?: boolean,"location_id"?: string,"organization_id"?: string,"preferred_name"?: string | null,"updated_at"?: string
+                    "created_at"?: string,"department_id"?: string,"email"?: string,"full_name"?: string,"id"?: string,"is_active"?: boolean,"location_id"?: string,"organization_id"?: string,"person_id"?: string,"preferred_name"?: string | null,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -269,14 +269,14 @@ isOneToOne: false
                   ]
                 },"visits": {
                   Row: {
-                    "admitted_at": string | null,"arrived_at": string,"check_in_method": Database["public"]['Enums']["tgm_check_in_method"],"checkout_actor_id": string | null,"checkout_corrected_at": string | null,"checkout_corrected_by": string | null,"checkout_correction_reason": string | null,"checkout_location_id": string | null,"checkout_method": Database["public"]['Enums']["tgm_checkout_method"] | null,"created_at": string,"department_id": string | null,"host_approved_at": string | null,"id": string,"location_id": string,"organization": string | null,"organization_id": string,"phone_number": string,"purpose": string,"reception_reviewed_at": string | null,"staff_id": string | null,"status": Database["public"]['Enums']["tgm_visit_status"],"submission_idempotency_key": string | null,"time_out": string | null,"updated_at": string,"visit_type": Database["public"]['Enums']["tgm_visit_type"],"visitor_email": string | null,"visitor_full_name": string,"visitor_preferred_name": string | null
+                    "admitted_at": string | null,"arrived_at": string,"check_in_method": Database["public"]['Enums']["tgm_check_in_method"],"checkout_actor_id": string | null,"checkout_corrected_at": string | null,"checkout_corrected_by": string | null,"checkout_correction_reason": string | null,"checkout_location_id": string | null,"checkout_method": Database["public"]['Enums']["tgm_checkout_method"] | null,"created_at": string,"department_id": string | null,"host_approved_at": string | null,"host_display_name_at_assignment": string | null,"id": string,"location_id": string,"organization": string | null,"organization_id": string,"phone_number": string,"purpose": string,"reception_reviewed_at": string | null,"staff_id": string | null,"status": Database["public"]['Enums']["tgm_visit_status"],"submission_idempotency_key": string | null,"time_out": string | null,"updated_at": string,"visit_type": Database["public"]['Enums']["tgm_visit_type"],"visitor_email": string | null,"visitor_full_name": string,"visitor_preferred_name": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "admitted_at"?: string | null,"arrived_at"?: string,"check_in_method": Database["public"]['Enums']["tgm_check_in_method"],"checkout_actor_id"?: string | null,"checkout_corrected_at"?: string | null,"checkout_corrected_by"?: string | null,"checkout_correction_reason"?: string | null,"checkout_location_id"?: string | null,"checkout_method"?: Database["public"]['Enums']["tgm_checkout_method"] | null,"created_at"?: string,"department_id"?: string | null,"host_approved_at"?: string | null,"id"?: string,"location_id": string,"organization"?: string | null,"organization_id": string,"phone_number": string,"purpose": string,"reception_reviewed_at"?: string | null,"staff_id"?: string | null,"status"?: Database["public"]['Enums']["tgm_visit_status"],"submission_idempotency_key"?: string | null,"time_out"?: string | null,"updated_at"?: string,"visit_type": Database["public"]['Enums']["tgm_visit_type"],"visitor_email"?: string | null,"visitor_full_name": string,"visitor_preferred_name"?: string | null
+                    "admitted_at"?: string | null,"arrived_at"?: string,"check_in_method": Database["public"]['Enums']["tgm_check_in_method"],"checkout_actor_id"?: string | null,"checkout_corrected_at"?: string | null,"checkout_corrected_by"?: string | null,"checkout_correction_reason"?: string | null,"checkout_location_id"?: string | null,"checkout_method"?: Database["public"]['Enums']["tgm_checkout_method"] | null,"created_at"?: string,"department_id"?: string | null,"host_approved_at"?: string | null,"host_display_name_at_assignment"?: string | null,"id"?: string,"location_id": string,"organization"?: string | null,"organization_id": string,"phone_number": string,"purpose": string,"reception_reviewed_at"?: string | null,"staff_id"?: string | null,"status"?: Database["public"]['Enums']["tgm_visit_status"],"submission_idempotency_key"?: string | null,"time_out"?: string | null,"updated_at"?: string,"visit_type": Database["public"]['Enums']["tgm_visit_type"],"visitor_email"?: string | null,"visitor_full_name": string,"visitor_preferred_name"?: string | null
                   }
                   Update: {
-                    "admitted_at"?: string | null,"arrived_at"?: string,"check_in_method"?: Database["public"]['Enums']["tgm_check_in_method"],"checkout_actor_id"?: string | null,"checkout_corrected_at"?: string | null,"checkout_corrected_by"?: string | null,"checkout_correction_reason"?: string | null,"checkout_location_id"?: string | null,"checkout_method"?: Database["public"]['Enums']["tgm_checkout_method"] | null,"created_at"?: string,"department_id"?: string | null,"host_approved_at"?: string | null,"id"?: string,"location_id"?: string,"organization"?: string | null,"organization_id"?: string,"phone_number"?: string,"purpose"?: string,"reception_reviewed_at"?: string | null,"staff_id"?: string | null,"status"?: Database["public"]['Enums']["tgm_visit_status"],"submission_idempotency_key"?: string | null,"time_out"?: string | null,"updated_at"?: string,"visit_type"?: Database["public"]['Enums']["tgm_visit_type"],"visitor_email"?: string | null,"visitor_full_name"?: string,"visitor_preferred_name"?: string | null
+                    "admitted_at"?: string | null,"arrived_at"?: string,"check_in_method"?: Database["public"]['Enums']["tgm_check_in_method"],"checkout_actor_id"?: string | null,"checkout_corrected_at"?: string | null,"checkout_corrected_by"?: string | null,"checkout_correction_reason"?: string | null,"checkout_location_id"?: string | null,"checkout_method"?: Database["public"]['Enums']["tgm_checkout_method"] | null,"created_at"?: string,"department_id"?: string | null,"host_approved_at"?: string | null,"host_display_name_at_assignment"?: string | null,"id"?: string,"location_id"?: string,"organization"?: string | null,"organization_id"?: string,"phone_number"?: string,"purpose"?: string,"reception_reviewed_at"?: string | null,"staff_id"?: string | null,"status"?: Database["public"]['Enums']["tgm_visit_status"],"submission_idempotency_key"?: string | null,"time_out"?: string | null,"updated_at"?: string,"visit_type"?: Database["public"]['Enums']["tgm_visit_type"],"visitor_email"?: string | null,"visitor_full_name"?: string,"visitor_preferred_name"?: string | null
                   }
                   Relationships: [
                     {
@@ -380,6 +380,11 @@ isOneToOne: false
               "accepted_at": string,"created_at": string,"delivery_status": string,"email": string,"expires_at": string,"id": string,"location_id": string,"resend_count": number,"revoked_at": string,"role": Database["public"]['Enums']["tgm_operator_role"]
             }[]
                            },
+"tgm_list_organization_invitations_page":
+{ Args: { "p_actor_id": string,"p_after_created_at"?: string,"p_after_id"?: string,"p_limit"?: number,"p_search"?: string }; Returns: {
+              "accepted_at": string,"created_at": string,"delivery_status": string,"email": string,"expires_at": string,"id": string,"invited_by": string,"inviter_email": string,"last_attempt_at": string,"location_id": string,"resend_count": number,"revoked_at": string,"role": Database["public"]['Enums']["tgm_operator_role"]
+            }[]
+                           },
 "tgm_list_organization_operators":
 { Args: { "p_actor_id": string }; Returns: {
               "email": string,"is_active": boolean,"location_id": string,"role": Database["public"]['Enums']["tgm_operator_role"],"user_id": string
@@ -399,6 +404,7 @@ isOneToOne: false
 "created_at": string,
 "department_id": string | null,
 "host_approved_at": string | null,
+"host_display_name_at_assignment": string | null,
 "id": string,
 "location_id": string,
 "organization": string | null,
@@ -443,6 +449,26 @@ isOneToOne: false
 "tgm_mark_stale_host_email":
 { Args: { "p_actor_id": string,"p_visit_id": string }; Returns: number
                            },
+"tgm_move_staff_assignment":
+{ Args: { "p_actor_id": string,"p_department_id": string,"p_location_id": string,"p_staff_id": string }; Returns: {
+              "created_at": string,
+"department_id": string,
+"email": string,
+"full_name": string,
+"id": string,
+"is_active": boolean,
+"location_id": string,
+"organization_id": string,
+"person_id": string,
+"preferred_name": string | null,
+"updated_at": string
+            }
+                          SetofOptions: {
+        from: "*"
+        to: "staff"
+        isOneToOne: true
+        isSetofReturn: false
+      } },
 "tgm_operator_visit_action":
 { Args: { "p_action": string,"p_actor_id": string,"p_patch"?: Json,"p_visit_id": string }; Returns: {
               "admitted_at": string | null,
@@ -457,6 +483,45 @@ isOneToOne: false
 "created_at": string,
 "department_id": string | null,
 "host_approved_at": string | null,
+"host_display_name_at_assignment": string | null,
+"id": string,
+"location_id": string,
+"organization": string | null,
+"organization_id": string,
+"phone_number": string,
+"purpose": string,
+"reception_reviewed_at": string | null,
+"staff_id": string | null,
+"status": Database["public"]['Enums']["tgm_visit_status"],
+"submission_idempotency_key": string | null,
+"time_out": string | null,
+"updated_at": string,
+"visit_type": Database["public"]['Enums']["tgm_visit_type"],
+"visitor_email": string | null,
+"visitor_full_name": string,
+"visitor_preferred_name": string | null
+            }
+                          SetofOptions: {
+        from: "*"
+        to: "visits"
+        isOneToOne: true
+        isSetofReturn: false
+      } },
+"tgm_operator_visit_action_core":
+{ Args: { "p_action": string,"p_actor_id": string,"p_patch"?: Json,"p_visit_id": string }; Returns: {
+              "admitted_at": string | null,
+"arrived_at": string,
+"check_in_method": Database["public"]['Enums']["tgm_check_in_method"],
+"checkout_actor_id": string | null,
+"checkout_corrected_at": string | null,
+"checkout_corrected_by": string | null,
+"checkout_correction_reason": string | null,
+"checkout_location_id": string | null,
+"checkout_method": Database["public"]['Enums']["tgm_checkout_method"] | null,
+"created_at": string,
+"department_id": string | null,
+"host_approved_at": string | null,
+"host_display_name_at_assignment": string | null,
 "id": string,
 "location_id": string,
 "organization": string | null,
