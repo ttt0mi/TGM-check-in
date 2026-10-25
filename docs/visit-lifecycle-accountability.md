@@ -18,12 +18,12 @@ active organization admin and accepts:
 
 ```json
 {
-  "visit_id": "visit-uuid",
-  "action": "correct_checkout",
-  "patch": {
-    "reason": "Required explanation, up to 500 characters",
-    "time_out": "2026-10-22T15:30:00Z"
-  }
+	"visit_id": "visit-uuid",
+	"action": "correct_checkout",
+	"patch": {
+		"reason": "Required explanation, up to 500 characters",
+		"time_out": "2026-10-22T15:30:00Z"
+	}
 }
 ```
 
@@ -68,8 +68,8 @@ Successful submissions return:
 
 ```json
 {
-  "accepted": true,
-  "visitor_session_created": true
+	"accepted": true,
+	"visitor_session_created": true
 }
 ```
 

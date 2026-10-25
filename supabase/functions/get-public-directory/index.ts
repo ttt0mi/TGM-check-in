@@ -23,7 +23,7 @@ export default {
 			if (!location) return json({ error: "Location unavailable" }, 404);
 			const { data: organization, error: organizationError } = await service
 				.from("organizations")
-				.select("id")
+				.select("id,name")
 				.eq("id", location.organization_id)
 				.eq("is_active", true)
 				.maybeSingle();
@@ -66,6 +66,7 @@ export default {
 				}));
 
 			return json({
+				organization: { name: organization.name },
 				location: {
 					name: location.name,
 					address: location.address,

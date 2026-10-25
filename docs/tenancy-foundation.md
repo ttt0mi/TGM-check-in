@@ -49,12 +49,12 @@ customer's visit data is outside this phase.
 All four endpoints require a verified Supabase Auth user JWT and return
 `Cache-Control: no-store`.
 
-| Endpoint | Request | Result |
-| --- | --- | --- |
-| `register-organization` | `{ "name": string }` | `{ "organization_id": uuid }`; one organization per account; rollout flag required |
-| `create-branch` | `{ "name": string, "address": string, "timezone": IANA_name }` | `{ "location_id": uuid }`; customer admin only |
-| `invite-operator` | `{ "email": string, "role": "admin" \| "receptionist", "location_id"?: uuid }` | `{ "invitation_id": uuid, "token": string, "expires_in_days": 7 }`; customer admin only; deliver token out of band until UI exists |
-| `accept-operator-invite` | `{ "token": string }` | `{ "organization_id": uuid }`; verified email must match invitation |
+| Endpoint                 | Request                                                                        | Result                                                                                                                             |
+| ------------------------ | ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `register-organization`  | `{ "name": string }`                                                           | `{ "organization_id": uuid }`; one organization per account; rollout flag required                                                 |
+| `create-branch`          | `{ "name": string, "address": string, "timezone": IANA_name }`                 | `{ "location_id": uuid }`; customer admin only                                                                                     |
+| `invite-operator`        | `{ "email": string, "role": "admin" \| "receptionist", "location_id"?: uuid }` | `{ "invitation_id": uuid, "token": string, "expires_in_days": 7 }`; customer admin only; deliver token out of band until UI exists |
+| `accept-operator-invite` | `{ "token": string }`                                                          | `{ "organization_id": uuid }`; verified email must match invitation                                                                |
 
 `manage-operator` can now update or deactivate only members of the caller's
 organization. Initial membership goes through invitation acceptance. A

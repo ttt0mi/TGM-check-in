@@ -1,0 +1,142 @@
+"use client";
+
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useState } from "react";
+import { useForm, useWatch } from "react-hook-form";
+import { createClient } from "@/lib/supabase/browser";
+import { publicVisitSchema, visitTypes, type PublicVisitValues } from "@/features/public-check-in/schema";
+import type { Department, Staff } from "./types";
+import styles from "./operator.module.css";
+
+export function AssistedForm({
+	branchId,
+	departments,
+	staff,
+	onCreated,
+}: {
+	branchId: string;
+	departments: Department[];
+	staff: Staff[];
+	onCreated: () => void;
+}) {
+	const [idempotencyKey, setIdempotencyKey] = useState<string | null>(null);
+	const [error, setError] = useState("");
+	const form = useForm<PublicVisitValues>({
+		resolver: zodResolver(publicVisitSchema),
+		defaultValues: {
+			visitor_full_name: "",
+			visitor_preferred_name: "",
+			visitor_email: "",
+			phone_number: "",
+			organization: "",
+			visit_type: "business",
+			purpose: "",
+			department_id: "",
+			staff_id: "",
+		},
+	});
+	const departmentId = useWatch({
+		control: form.control,
+		name: "department_id",
+	});
+
+	async function submit(values: PublicVisitValues) {
+		const key = idempotencyKey ?? crypto.randomUUID();
+		setIdempotencyKey(key);
+		setError("");
+		const { error: failure } = await createClient().functions.invoke("create-assisted-visit", {
+			body: {
+				location_id: branchId,
+				idempotency_key: key,
+				visitor_full_name: values.visitor_full_name,
+				visitor_preferred_name: values.visitor_preferred_name || null,
+				visitor_email: values.visitor_email || null,
+				phone_number: values.phone_number,
+				organization: values.organization || null,
+				visit_type: values.visit_type,
+				purpose: values.purpose,
+				department_id: values.department_id || null,
+				staff_id: values.staff_id || null,
+			},
+		});
+		if (failure) {
+			setError(failure.message);
+			return;
+		}
+		setIdempotencyKey(null);
+		form.reset();
+		onCreated();
+	}
+
+	return (
+		<form className={styles.form} onSubmit={form.handleSubmit(submit)} noValidate>
+			<h2>Assisted check-in</h2>
+			<label>
+				Full name <input {...form.register("visitor_full_name")} />
+			</label>
+			{form.formState.errors.visitor_full_name && (
+				<small>{form.formState.errors.visitor_full_name.message}</small>
+			)}
+			<label>
+				Preferred name <input {...form.register("visitor_preferred_name")} />
+			</label>
+			<label>
+				Email (optional) <input type="email" {...form.register("visitor_email")} />
+			</label>
+			<label>
+				Phone number <input type="tel" placeholder="+234…" {...form.register("phone_number")} />
+			</label>
+			{form.formState.errors.phone_number && <small>{form.formState.errors.phone_number.message}</small>}
+			<label>
+				Organization (optional) <input {...form.register("organization")} />
+			</label>
+			<label>
+				Visit type{" "}
+				<select {...form.register("visit_type")}>
+					{visitTypes.map((type) => (
+						<option key={type} value={type}>
+							{type}
+						</option>
+					))}
+				</select>
+			</label>
+			<label>
+				Purpose <textarea rows={2} {...form.register("purpose")} />
+			</label>
+			<label>
+				Department (optional){" "}
+				<select
+					{...form.register("department_id", {
+						onChange: () => form.setValue("staff_id", ""),
+					})}
+				>
+					<option value="">No department</option>
+					{departments.map((item) => (
+						<option key={item.id} value={item.id}>
+							{item.name}
+						</option>
+					))}
+				</select>
+			</label>
+			<label>
+				Host (optional){" "}
+				<select disabled={!departmentId} {...form.register("staff_id")}>
+					<option value="">No host</option>
+					{staff
+						.filter((item) => item.department_id === departmentId)
+						.map((item) => (
+							<option key={item.id} value={item.id}>
+								{item.preferred_name || item.full_name}
+							</option>
+						))}
+				</select>
+			</label>
+			{error && (
+				<p role="alert" className={styles.error}>
+					{error}
+				</p>
+			)}
+			<button disabled={form.formState.isSubmitting}>Create visit</button>
+		</form>
+	);
+}

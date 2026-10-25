@@ -10,20 +10,10 @@ import {
 	uuid,
 } from "../_shared/tgm.ts";
 import type { Database } from "../_shared/database.ts";
+import { appOrigin } from "../_shared/invitation-email.ts";
 
 function safeOrigin(): string {
-	const url = new URL(env("HOST_DECISION_ORIGIN"));
-	if (
-		url.protocol !== "https:" ||
-		url.username ||
-		url.password ||
-		url.search ||
-		url.hash ||
-		url.pathname !== "/"
-	) {
-		throw new Error("HOST_DECISION_ORIGIN must be an HTTPS origin");
-	}
-	return url.origin;
+	return appOrigin();
 }
 
 function htmlEscape(value: string): string {

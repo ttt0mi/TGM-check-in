@@ -1,0 +1,20 @@
+import { notFound, redirect } from "next/navigation";
+import { CreateOrganization } from "@/features/auth/CreateOrganization";
+import { frontendEnabled } from "@/lib/feature-flags";
+import { createClient } from "@/lib/supabase/server";
+export default async function CreateOrganizationPage() {
+	if (!frontendEnabled("auth")) notFound();
+	const supabase = await createClient();
+	const {
+		data: { user },
+	} = await supabase.auth.getUser();
+	if (!user) redirect("/login");
+	if (!user.email_confirmed_at) redirect("/verify-email");
+	const { data: profile } = await supabase
+		.from("operator_profiles")
+		.select("organization_id")
+		.eq("user_id", user.id)
+		.maybeSingle();
+	if (profile?.organization_id) redirect("/start");
+	return <CreateOrganization />;
+}

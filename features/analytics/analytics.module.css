@@ -1,0 +1,119 @@
+.page {
+	max-width: 1180px;
+	margin: auto;
+	padding: 30px 20px 80px;
+	color: #17263a;
+}
+.page > a {
+	color: #1e3858;
+}
+.filters {
+	display: grid;
+	gap: 14px;
+	margin: 20px 0 26px;
+	padding: 20px;
+	border: 1px solid #e3e8ef;
+	border-radius: 12px;
+	background: white;
+}
+.filters label {
+	display: grid;
+	gap: 6px;
+	max-width: 280px;
+	font-size: 13px;
+	font-weight: 650;
+}
+.filters select,
+.filters input {
+	min-height: 40px;
+	padding: 8px;
+	border: 1px solid #cbd5e0;
+	border-radius: 7px;
+}
+.filters fieldset {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	border: 0;
+	padding: 0;
+}
+.filters legend {
+	margin-bottom: 8px;
+	font-size: 13px;
+	font-weight: 650;
+}
+.filters button {
+	min-height: 36px;
+	padding: 7px 12px;
+	border: 1px solid #1e3858;
+	border-radius: 7px;
+	background: white;
+	color: #1e3858;
+	cursor: pointer;
+}
+.filters button[aria-pressed="true"],
+.filters > button {
+	background: #1e3858;
+	color: white;
+}
+.custom {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 16px;
+}
+.filters p {
+	margin: 0;
+	color: #657182;
+	font-size: 13px;
+}
+.cards,
+.charts,
+.tables {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+	gap: 16px;
+	margin: 18px 0;
+}
+.cards section,
+.charts section,
+.tables section {
+	padding: 20px;
+	border: 1px solid #e3e8ef;
+	border-radius: 12px;
+	background: white;
+}
+.cards section {
+	display: grid;
+	gap: 8px;
+}
+.cards strong {
+	font-size: 30px;
+}
+.cards span {
+	color: #657182;
+}
+.charts h2,
+.tables h2 {
+	margin: 0 0 18px;
+	font-size: 18px;
+}
+.tables table {
+	width: 100%;
+	border-collapse: collapse;
+}
+.tables th {
+	text-align: left;
+	text-transform: capitalize;
+	font-weight: 500;
+}
+.tables td {
+	text-align: right;
+	font-variant-numeric: tabular-nums;
+}
+.tables tr + tr {
+	border-top: 1px solid #edf0f4;
+}
+.tables th,
+.tables td {
+	padding: 9px 0;
+}
