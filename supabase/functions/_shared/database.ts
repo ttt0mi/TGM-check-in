@@ -37,6 +37,7 @@ export type Database = Omit<GeneratedDatabase, "public"> & {
 			| "tgm_create_operator_invitation"
 			| "tgm_create_public_visit"
 			| "tgm_public_visit_retry_matches"
+			| "tgm_start_visit_export"
 		> & {
 			tgm_create_assisted_visit: WithArgs<
 				"tgm_create_assisted_visit",
@@ -60,6 +61,14 @@ export type Database = Omit<GeneratedDatabase, "public"> & {
 				Args: PublicVisitArgs;
 				Returns: boolean;
 			};
+			tgm_start_visit_export: WithArgs<
+				"tgm_start_visit_export",
+				{
+					p_location_id: string | null;
+					p_start_date: string | null;
+					p_end_date: string | null;
+				}
+			>;
 		};
 	};
 };

@@ -104,10 +104,26 @@
 	margin: 12px 0;
 	padding: 16px;
 	border: 1px solid #dae1e8;
+	max-width: 100%;
+}
+.qrUrl {
+	max-width: 100%;
+	overflow-wrap: anywhere;
+}
+.qrControls {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 12px;
 }
 @media print {
+	@page {
+		size: A4 portrait;
+		margin: 18mm;
+	}
 	.page header,
 	.page nav,
+	.qrControls,
 	.form,
 	.section button,
 	.list li:not(.printTarget) {
@@ -117,5 +133,14 @@
 	.page {
 		border: 0;
 		padding: 0;
+	}
+	.qr {
+		break-inside: avoid;
+		border: 0;
+		padding: 0;
+	}
+	.qr svg {
+		width: 70mm;
+		height: 70mm;
 	}
 }

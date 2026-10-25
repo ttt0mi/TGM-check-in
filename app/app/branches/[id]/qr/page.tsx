@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { PrintableQr } from "@/features/admin/PrintableQr";
 import { Unavailable } from "@/features/shared/Unavailable";
 import { frontendEnabled } from "@/lib/feature-flags";
+import { parseAppOrigin } from "@/supabase/functions/_shared/origin";
 
 export default async function QrPage({ params }: { params: Promise<{ id: string }> }) {
 	if (!frontendEnabled("admin"))
@@ -26,22 +27,32 @@ export default async function QrPage({ params }: { params: Promise<{ id: string 
 	const { id } = await params;
 	const { data: branch } = await supabase
 		.from("locations")
-		.select("id,name,public_slug,organization_id")
+		.select("id,name,public_slug,organization_id,is_active")
 		.eq("id", id)
 		.eq("organization_id", profile.organization_id)
 		.maybeSingle();
 	if (!branch) notFound();
 	const { data: org } = await supabase
 		.from("organizations")
-		.select("name")
+		.select("name,is_active")
 		.eq("id", profile.organization_id)
 		.single();
-	const origin = process.env.APP_ORIGIN || (process.env.NODE_ENV !== "production" ? "http://localhost:3000" : "");
-	if (!origin) throw new Error("APP_ORIGIN is required for printable QR codes");
+	if (!org?.is_active) redirect("/suspended");
+	const { data: notice, error: noticeError } = await supabase
+		.from("organization_privacy_notices")
+		.select("approved_at")
+		.eq("organization_id", profile.organization_id)
+		.maybeSingle();
+	if (noticeError) throw noticeError;
+	const origin = parseAppOrigin(
+		process.env.APP_ORIGIN || (process.env.NODE_ENV !== "production" ? "http://localhost:3000" : undefined),
+		process.env.NODE_ENV !== "production",
+	);
 	return (
 		<PrintableQr
 			branch={branch}
-			organizationName={org?.name ?? "TGM"}
+			privacyApproved={Boolean(notice?.approved_at)}
+			organizationName={org.name}
 			url={`${origin}/check-in/${branch.public_slug}`}
 		/>
 	);

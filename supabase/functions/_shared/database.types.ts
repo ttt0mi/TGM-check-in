@@ -370,6 +370,9 @@ isOneToOne: false
 "tgm_finish_host_email":
 { Args: { "p_attempt_id": string,"p_error_code"?: string,"p_provider_message_id"?: string,"p_status": Database["public"]['Enums']["tgm_notification_status"] }; Returns: boolean
                            },
+"tgm_finish_visit_export":
+{ Args: { "p_actor_id": string,"p_export_id": string,"p_row_count": number }; Returns: undefined
+                           },
 "tgm_get_visitor_visit":
 { Args: { "p_token_hash": string }; Returns: {
               "admitted_at": string,"branch_name": string,"host_name": string,"organization_name": string,"self_checkout_available": boolean,"status": Database["public"]['Enums']["tgm_visit_status"],"time_out": string,"visitor_display_name": string
@@ -573,8 +576,19 @@ isOneToOne: false
 "tgm_rotate_operator_invitation":
 { Args: { "p_actor_id": string,"p_invitation_id": string,"p_token_hash": string }; Returns: string
                            },
+"tgm_start_visit_export":
+{ Args: { "p_actor_id": string,"p_end_date": string,"p_location_id": string,"p_preset": string,"p_redacted": boolean,"p_start_date": string }; Returns: string
+                           },
 "tgm_visit_queue_counts":
 { Args: { "p_location_id": string,"p_search"?: string }; Returns: Json
+                           },
+"tgm_visit_report_aggregate":
+{ Args: { "p_actor_id": string,"p_end_date"?: string,"p_location_id"?: string,"p_preset"?: string,"p_start_date"?: string }; Returns: Json
+                           },
+"tgm_visit_report_page":
+{ Args: { "p_actor_id": string,"p_after_arrived_at"?: string,"p_after_id"?: string,"p_end_date"?: string,"p_limit"?: number,"p_location_id"?: string,"p_preset"?: string,"p_start_date"?: string }; Returns: {
+              "admitted_at": string,"arrived_at": string,"branch_id": string,"branch_name": string,"branch_timezone": string,"check_in_method": string,"host_name": string,"id": string,"phone_number": string,"purpose": string,"status": string,"time_out": string,"visit_type": string,"visitor_email": string,"visitor_full_name": string,"visitor_organization": string,"visitor_preferred_name": string
+            }[]
                            }
           }
           Enums: {
