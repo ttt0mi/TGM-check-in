@@ -54,25 +54,26 @@ export function BranchManagement({ branches, onChanged }: { branches: Branch[]; 
 	return (
 		<section className={styles.section}>
 			<h2>Branches</h2>
-			<form className={styles.form} onSubmit={form.handleSubmit(create)}>
+			<form className={styles.form} onSubmit={form.handleSubmit(create, (errors) => {
+				const first = Object.keys(errors)[0] as keyof Values | undefined;
+				if (first) form.setFocus(first);
+			})} noValidate>
 				<label>
-					Name <input {...form.register("name")} />
+					Name <input aria-invalid={!!form.formState.errors.name} aria-describedby={form.formState.errors.name ? "branch-name-error" : undefined} {...form.register("name")} />
 				</label>
+				{form.formState.errors.name && <small id="branch-name-error" role="alert">{form.formState.errors.name.message}</small>}
 				<label>
-					Address <input required {...form.register("address")} />
+					Address <input required aria-invalid={!!form.formState.errors.address} aria-describedby={form.formState.errors.address ? "branch-address-error" : undefined} {...form.register("address")} />
 				</label>
+				{form.formState.errors.address && <small id="branch-address-error" role="alert">{form.formState.errors.address.message}</small>}
 				<label>
-					Time zone <input {...form.register("timezone")} placeholder="Africa/Lagos" />
+					Time zone <input aria-invalid={!!form.formState.errors.timezone} aria-describedby={form.formState.errors.timezone ? "branch-timezone-error" : undefined} {...form.register("timezone")} placeholder="Africa/Lagos" />
 				</label>
+				{form.formState.errors.timezone && <small id="branch-timezone-error" role="alert">{form.formState.errors.timezone.message}</small>}
 				<button disabled={form.formState.isSubmitting}>
 					{form.formState.isSubmitting ? "Creating…" : "Create branch"}
 				</button>
 			</form>
-			{Object.values(form.formState.errors).map((error, index) => (
-				<p className={styles.error} key={index}>
-					{error.message}
-				</p>
-			))}
 			{message && <p role={messageRole(message)}>{message}</p>}
 			<ul className={styles.list}>
 				{branches.length === 0 && <li>No branches yet. Use the form above to create the first branch.</li>}
