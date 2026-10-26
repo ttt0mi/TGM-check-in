@@ -117,7 +117,7 @@ export function PublicCheckIn({
 					"The branch directory could not refresh. Retry before submitting or ask reception for help.",
 				);
 			}
-		}
+		};
 		void refreshDirectory();
 		const interval = window.setInterval(() => void refreshDirectory(), 120_000);
 		window.addEventListener("focus", refreshDirectory);
@@ -252,6 +252,12 @@ export function PublicCheckIn({
 						<button
 							type="button"
 							onClick={() => {
+								if (
+									(!clockVisit || !["checked_out", "declined", "cancelled", "auto_closed"].includes(clockVisit.status)) &&
+									!window.confirm(
+										"This visit is still active. Starting another visitor will remove its status from this tablet. The current visitor should keep their own status link or ask reception for updates. Continue?",
+									)
+								) return;
 								clearVisitorToken(slug);
 								setSessionToken(null);
 								setClockVisit(null);

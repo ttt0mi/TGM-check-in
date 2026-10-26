@@ -80,7 +80,7 @@ export function VisitStatus({
 			<h2>Your visit</h2>
 			{visit ? (
 				<>
-					<strong>{labels[visit.status] ?? visit.status}</strong>
+					<strong>{labels[visit.status] ?? "Your visit was updated"}</strong>
 					<p>
 						{visit.visitor_display_name} · {visit.branch_name}
 					</p>
