@@ -28,6 +28,7 @@ type Invitation = {
 	last_attempt_at: string | null;
 };
 type InvitationCursor = { created_at: string; id: string };
+type OperatorCursor = { email: string; id: string };
 
 function invitationState(item: Invitation, asOf: number) {
 	if (item.accepted_at) return "Accepted";
@@ -56,27 +57,41 @@ export function AccessManagement({ branches }: { branches: Branch[] }) {
 	const [search, setSearch] = useState("");
 	const [nextCursor, setNextCursor] = useState<InvitationCursor | null>(null);
 	const [asOf, setAsOf] = useState(0);
+	const [operatorSearchInput, setOperatorSearchInput] = useState("");
 	const [operatorSearch, setOperatorSearch] = useState("");
-	const [operatorPage, setOperatorPage] = useState(0);
+	const [operatorNextCursor, setOperatorNextCursor] = useState<OperatorCursor | null>(null);
 	const requestId = useRef(0);
-	const matchingOperators = operators.filter((item) =>
-		item.email.toLowerCase().includes(operatorSearch.trim().toLowerCase()),
-	);
 
 	const refresh = useCallback(async () => {
 		const currentRequest = ++requestId.current;
-		const { data, error } = await createClient().functions.invoke(
-			"operator-directory",
-			search ? { body: { search } } : { method: "GET" },
-		);
+		const { data, error } = await createClient().functions.invoke("operator-directory", {
+			body: { search, operator_search: operatorSearch },
+		});
 		if (error) throw error;
 		if (currentRequest !== requestId.current) return;
 		setOperators(data.operators as Operator[]);
+		setOperatorNextCursor(data.operator_next_cursor as OperatorCursor | null);
 		setInvitations(data.invitations as Invitation[]);
 		setNextCursor(data.next_cursor as InvitationCursor | null);
 		setAsOf(Date.now());
 		setLoading(false);
-	}, [search]);
+	}, [search, operatorSearch]);
+	async function loadMoreOperators() {
+		if (!operatorNextCursor) return;
+		const currentRequest = requestId.current;
+		setBusy("more-operators", true);
+		const { data, error } = await createClient().functions.invoke("operator-directory", {
+			body: { operator_search: operatorSearch, operator_after_email: operatorNextCursor.email, operator_after_id: operatorNextCursor.id },
+		});
+		setBusy("more-operators", false);
+		if (error) {
+			setMessage("Unable to load more operators. Please retry.");
+			return;
+		}
+		if (currentRequest !== requestId.current) return;
+		setOperators((current) => [...current, ...(data.operators as Operator[])]);
+		setOperatorNextCursor(data.operator_next_cursor as OperatorCursor | null);
+	}
 	async function loadMore() {
 		if (!nextCursor) return;
 		const currentRequest = requestId.current;
@@ -314,16 +329,15 @@ export function AccessManagement({ branches }: { branches: Branch[] }) {
 				Search operators{" "}
 				<input
 					type="search"
-					value={operatorSearch}
-					onChange={(event) => {
-						setOperatorSearch(event.target.value);
-						setOperatorPage(0);
-					}}
+					value={operatorSearchInput}
+					maxLength={120}
+					onChange={(event) => setOperatorSearchInput(event.target.value)}
 				/>
 			</label>
-			<p>{matchingOperators.length} operator(s) found</p>
+			<button onClick={() => operatorSearchInput.trim() === operatorSearch ? void refresh() : setOperatorSearch(operatorSearchInput.trim())}>Search operators</button>
+			<p>{operators.length} operator(s) loaded{operatorNextCursor ? "; more available" : ""}</p>
 			<ul className={styles.list}>
-				{matchingOperators.slice(operatorPage * 25, operatorPage * 25 + 25).map((item) => (
+				{operators.map((item) => (
 					<OperatorRow
 						key={`${item.user_id}-${item.role}-${item.location_id}-${item.is_active}`}
 						operator={item}
@@ -333,19 +347,12 @@ export function AccessManagement({ branches }: { branches: Branch[] }) {
 					/>
 				))}
 			</ul>
-			{!loading && matchingOperators.length === 0 && <p>No operators match this search.</p>}
-			<div className={styles.form}>
-				<button disabled={operatorPage === 0} onClick={() => setOperatorPage((page) => page - 1)}>
-					Previous operators
+			{!loading && operators.length === 0 && <p>No operators match this search.</p>}
+			{operatorNextCursor && (
+				<button disabled={busyKeys.has("more-operators")} onClick={() => void loadMoreOperators()}>
+					{busyKeys.has("more-operators") ? "Loading…" : "Load more operators"}
 				</button>
-				<span>Page {operatorPage + 1}</span>
-				<button
-					disabled={(operatorPage + 1) * 25 >= matchingOperators.length}
-					onClick={() => setOperatorPage((page) => page + 1)}
-				>
-					Next operators
-				</button>
-			</div>
+			)}
 			{message && <p role={messageRole(message)}>{message}</p>}
 		</section>
 	);

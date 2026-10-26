@@ -1,4 +1,4 @@
-import { notFound, redirect } from "next/navigation";
+import { redirect } from "next/navigation";
 import { frontendEnabled } from "@/lib/feature-flags";
 import { createClient } from "@/lib/supabase/server";
 import { Management } from "@/features/admin/Management";
@@ -21,51 +21,55 @@ export default async function ManagePage({ searchParams }: { searchParams: Promi
 		data: { user },
 	} = await supabase.auth.getUser();
 	if (!user) redirect("/login");
-	const { data: profile } = await supabase
+	const { data: profile, error: profileError } = await supabase
 		.from("operator_profiles")
 		.select("role,is_active,organization_id")
 		.eq("user_id", user.id)
 		.maybeSingle();
-	if (!profile?.is_active || profile.role !== "admin" || !profile.organization_id) notFound();
-	const [org, branches, departments, staff, privacy] = await Promise.all([
-		supabase.from("organizations").select("id,name,is_active").eq("id", profile.organization_id).single(),
-		supabase
+	if (profileError) throw profileError;
+	if (!profile?.is_active) redirect("/suspended");
+	if (!profile.organization_id || profile.role !== "admin")
+		return <Unavailable title="Administrator access required" detail="Ask an organization administrator to grant access." />;
+	const org = await supabase.from("organizations").select("id,name,is_active").eq("id", profile.organization_id).maybeSingle();
+	if (org.error) throw org.error;
+	if (!org.data?.is_active) redirect("/suspended");
+	const [branches, departments, staff, privacy] = await Promise.all([
+		tab !== "organization" ? supabase
 			.from("locations")
 			.select(
 				"id,name,timezone,public_slug,is_active,auto_close_enabled,auto_close_local_time,address,reception_overdue_minutes,host_overdue_minutes,admission_overdue_minutes",
 			)
 			.eq("organization_id", profile.organization_id)
-			.order("name"),
-		supabase
+			.order("name") : null,
+		tab === "directory" ? supabase
 			.from("departments")
 			.select("id,name,is_active")
 			.eq("organization_id", profile.organization_id)
-			.order("name"),
-		supabase
+			.order("name") : null,
+		tab === "directory" ? supabase
 			.from("staff")
 			.select("id,full_name,preferred_name,department_id,location_id,email,is_active")
 			.eq("organization_id", profile.organization_id)
 			.order("full_name")
 			.order("id")
-			.range(0, 24),
-		supabase
+			.range(0, 24) : null,
+		tab === "organization" ? supabase
 			.from("organization_privacy_notices")
 			.select("notice_copy,policy_url,approved_at,approved_by")
 			.eq("organization_id", profile.organization_id)
-			.maybeSingle(),
+			.maybeSingle() : null,
 	]);
-	if (org.error || branches.error || departments.error || staff.error || privacy.error) {
-		throw org.error || branches.error || departments.error || staff.error || privacy.error;
+	if (branches?.error || departments?.error || staff?.error || privacy?.error) {
+		throw branches?.error || departments?.error || staff?.error || privacy?.error;
 	}
-	if (!org.data?.is_active) redirect("/suspended");
 	return (
 		<Management
 			tab={tab}
 			organization={org.data}
-			privacyNotice={privacy.data}
-			branches={branches.data ?? []}
-			departments={departments.data ?? []}
-			staff={staff.data ?? []}
+			privacyNotice={privacy?.data ?? null}
+			branches={branches?.data ?? []}
+			departments={departments?.data ?? []}
+			staff={staff?.data ?? []}
 		/>
 	);
 }
