@@ -3,6 +3,7 @@ import { CreateOrganization } from "@/features/auth/CreateOrganization";
 import { Unavailable } from "@/features/shared/Unavailable";
 import { frontendEnabled } from "@/lib/feature-flags";
 import { createClient } from "@/lib/supabase/server";
+export const metadata = { title: "Create organization", description: "Set up your organization in TGM reception." };
 export default async function CreateOrganizationPage() {
 	if (!frontendEnabled("auth"))
 		return (

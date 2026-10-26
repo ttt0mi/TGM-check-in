@@ -1,6 +1,7 @@
 import { AuthForm } from "@/features/auth/AuthForm";
 import { Unavailable } from "@/features/shared/Unavailable";
 import { frontendEnabled } from "@/lib/feature-flags";
+export const metadata = { title: "Sign in", description: "Sign in to TGM reception." };
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
 	if (!frontendEnabled("auth"))
 		return <Unavailable title="Sign-in is unavailable" detail="Please contact your organization administrator." />;

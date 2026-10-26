@@ -1,8 +1,14 @@
 import { redirect } from "next/navigation";
+import type { Metadata } from "next";
 import { AnalyticsDashboard } from "@/features/analytics/AnalyticsDashboard";
 import { Unavailable } from "@/features/shared/Unavailable";
 import { frontendEnabled } from "@/lib/feature-flags";
 import { createClient } from "@/lib/supabase/server";
+
+export const metadata: Metadata = {
+	title: "Visit analytics",
+	description: "Review visit activity and export reports.",
+};
 
 export default async function AnalyticsPage() {
 	if (!frontendEnabled("analytics"))

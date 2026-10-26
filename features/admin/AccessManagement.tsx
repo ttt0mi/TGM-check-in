@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/browser";
 import type { Branch } from "@/features/operator/types";
+import { messageRole } from "@/features/shared/message-role";
 import styles from "./admin.module.css";
 
 type Operator = {
@@ -43,11 +44,13 @@ export function AccessManagement({ branches }: { branches: Branch[] }) {
 	const [branchId, setBranchId] = useState(branches.find((item) => item.is_active)?.id ?? "");
 	const [message, setMessage] = useState("");
 	const [busyKeys, setBusyKeys] = useState<Set<string>>(() => new Set());
-	const setBusy = (key: string, busy: boolean) => setBusyKeys((current) => {
-		const next = new Set(current);
-		if (busy) next.add(key); else next.delete(key);
-		return next;
-	});
+	const setBusy = (key: string, busy: boolean) =>
+		setBusyKeys((current) => {
+			const next = new Set(current);
+			if (busy) next.add(key);
+			else next.delete(key);
+			return next;
+		});
 	const [loading, setLoading] = useState(true);
 	const [searchInput, setSearchInput] = useState("");
 	const [search, setSearch] = useState("");
@@ -56,7 +59,9 @@ export function AccessManagement({ branches }: { branches: Branch[] }) {
 	const [operatorSearch, setOperatorSearch] = useState("");
 	const [operatorPage, setOperatorPage] = useState(0);
 	const requestId = useRef(0);
-	const matchingOperators = operators.filter((item) => item.email.toLowerCase().includes(operatorSearch.trim().toLowerCase()));
+	const matchingOperators = operators.filter((item) =>
+		item.email.toLowerCase().includes(operatorSearch.trim().toLowerCase()),
+	);
 
 	const refresh = useCallback(async () => {
 		const currentRequest = ++requestId.current;
@@ -192,15 +197,16 @@ export function AccessManagement({ branches }: { branches: Branch[] }) {
 		<section className={styles.section}>
 			<h2>Operator access</h2>
 			{loading && <p role="status">Loading operator and invitation records…</p>}
-			{!loading && (message.includes("could not be refreshed") || message.includes("Unable to load access records")) && (
-				<button
-					onClick={() =>
-						void refresh().catch(() => setMessage("Unable to refresh access records. Please retry."))
-					}
-				>
-					Retry refresh
-				</button>
-			)}
+			{!loading &&
+				(message.includes("could not be refreshed") || message.includes("Unable to load access records")) && (
+					<button
+						onClick={() =>
+							void refresh().catch(() => setMessage("Unable to refresh access records. Please retry."))
+						}
+					>
+						Retry refresh
+					</button>
+				)}
 			<h3>Invite an operator</h3>
 			<form className={styles.form} onSubmit={(event) => void invite(event)}>
 				<label>
@@ -228,7 +234,9 @@ export function AccessManagement({ branches }: { branches: Branch[] }) {
 						</select>
 					</label>
 				)}
-				<button disabled={busyKeys.has("invite")}>{busyKeys.has("invite") ? "Sending…" : "Send invitation"}</button>
+				<button disabled={busyKeys.has("invite")}>
+					{busyKeys.has("invite") ? "Sending…" : "Send invitation"}
+				</button>
 			</form>
 			<h3>Invitation history</h3>
 			<div className={styles.form}>
@@ -302,7 +310,17 @@ export function AccessManagement({ branches }: { branches: Branch[] }) {
 				</button>
 			)}
 			<h3>Operators</h3>
-			<label>Search operators <input type="search" value={operatorSearch} onChange={(event) => { setOperatorSearch(event.target.value); setOperatorPage(0); }} /></label>
+			<label>
+				Search operators{" "}
+				<input
+					type="search"
+					value={operatorSearch}
+					onChange={(event) => {
+						setOperatorSearch(event.target.value);
+						setOperatorPage(0);
+					}}
+				/>
+			</label>
 			<p>{matchingOperators.length} operator(s) found</p>
 			<ul className={styles.list}>
 				{matchingOperators.slice(operatorPage * 25, operatorPage * 25 + 25).map((item) => (
@@ -317,11 +335,18 @@ export function AccessManagement({ branches }: { branches: Branch[] }) {
 			</ul>
 			{!loading && matchingOperators.length === 0 && <p>No operators match this search.</p>}
 			<div className={styles.form}>
-				<button disabled={operatorPage === 0} onClick={() => setOperatorPage((page) => page - 1)}>Previous operators</button>
+				<button disabled={operatorPage === 0} onClick={() => setOperatorPage((page) => page - 1)}>
+					Previous operators
+				</button>
 				<span>Page {operatorPage + 1}</span>
-				<button disabled={(operatorPage + 1) * 25 >= matchingOperators.length} onClick={() => setOperatorPage((page) => page + 1)}>Next operators</button>
+				<button
+					disabled={(operatorPage + 1) * 25 >= matchingOperators.length}
+					onClick={() => setOperatorPage((page) => page + 1)}
+				>
+					Next operators
+				</button>
 			</div>
-			{message && <p role="status">{message}</p>}
+			{message && <p role={messageRole(message)}>{message}</p>}
 		</section>
 	);
 }
@@ -379,19 +404,19 @@ function OperatorRow({
 				>
 					Save access
 				</button>
-			{operator.is_active && dirty && (
-				<button
-					type="button"
-					disabled={busy}
-					onClick={() => {
-						if (!window.confirm(`Discard access changes for ${operator.email}?`)) return;
-						setRole(operator.role);
-						setBranchId(operator.location_id ?? branches.find((item) => item.is_active)?.id ?? "");
-					}}
-				>
-					Reset changes
-				</button>
-			)}
+				{operator.is_active && dirty && (
+					<button
+						type="button"
+						disabled={busy}
+						onClick={() => {
+							if (!window.confirm(`Discard access changes for ${operator.email}?`)) return;
+							setRole(operator.role);
+							setBranchId(operator.location_id ?? branches.find((item) => item.is_active)?.id ?? "");
+						}}
+					>
+						Reset changes
+					</button>
+				)}
 				{operator.is_active && (
 					<button disabled={busy} onClick={() => void onAction(operator, "deactivate")}>
 						Deactivate

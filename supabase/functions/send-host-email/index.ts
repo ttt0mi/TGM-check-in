@@ -5,6 +5,7 @@ import {
 	failure,
 	HttpError,
 	json,
+	logContext,
 	readJson,
 	sha256Hex,
 	uuid,
@@ -68,7 +69,7 @@ export default {
 					p_provider_message_id: providerId ?? undefined,
 					p_error_code: errorCode ?? undefined,
 				});
-				if (error) console.error("Could not finalize email attempt", error);
+				if (error) console.error(JSON.stringify({ event: "email_attempt_finalize_failed", correlation_id: crypto.randomUUID(), ...logContext() }));
 			};
 			const [visitResult, attemptResult] = await Promise.all([
 				operator.service
@@ -165,8 +166,8 @@ export default {
 			if (finalizeOnError) {
 				try {
 					await finalizeOnError();
-				} catch (finalizeError) {
-					console.error("Could not finalize email attempt", finalizeError);
+				} catch {
+					console.error(JSON.stringify({ event: "email_attempt_finalize_failed", correlation_id: crypto.randomUUID(), ...logContext() }));
 				}
 			}
 			return failure(error);

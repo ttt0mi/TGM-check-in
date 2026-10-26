@@ -96,7 +96,7 @@ export function VisitQueue({
 							Waiting {minutes} min{threshold !== null && minutes >= threshold ? " · Overdue" : ""}
 						</p>
 					)}
-				<VisitActions visit={visit} role={role} />
+				<VisitActions visit={visit} role={role} timezone={branch.timezone} />
 				<button
 					className={styles.detailsButton}
 					aria-expanded={expandedVisitId === visit.id}

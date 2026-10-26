@@ -2,6 +2,8 @@ import { RecoveryLink } from "@/features/auth/RecoveryLink";
 import { frontendEnabled } from "@/lib/feature-flags";
 import { Unavailable } from "@/features/shared/Unavailable";
 
+export const metadata = { title: "Password recovery", description: "Continue from a verified recovery link." };
+
 export default function RecoverPage() {
 	if (!frontendEnabled("auth"))
 		return (

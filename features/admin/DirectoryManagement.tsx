@@ -5,6 +5,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/browser";
 import Link from "next/link";
 import type { Branch, Department, Staff } from "@/features/operator/types";
+import { messageRole } from "@/features/shared/message-role";
 import styles from "./admin.module.css";
 
 const staffDetailsSchema = z.object({
@@ -47,7 +48,9 @@ export function DirectoryManagement({
 	const [staffLoading, setStaffLoading] = useState(true);
 	const staffRequest = useRef(0);
 	const [departmentSearch, setDepartmentSearch] = useState("");
-	const [blockingVisits, setBlockingVisits] = useState<{ id: string; visitor_full_name: string; status: string }[]>([]);
+	const [blockingVisits, setBlockingVisits] = useState<{ id: string; visitor_full_name: string; status: string }[]>(
+		[],
+	);
 	const [blockingBranchId, setBlockingBranchId] = useState<string | null>(null);
 	const loadStaff = useCallback(async () => {
 		const requestId = ++staffRequest.current;
@@ -102,8 +105,10 @@ export function DirectoryManagement({
 	async function addStaff(event: React.FormEvent) {
 		event.preventDefault();
 		setMessage("");
-		if (!branches.some((item) => item.id === branchId && item.is_active) ||
-			!departments.some((item) => item.id === departmentId && item.is_active)) {
+		if (
+			!branches.some((item) => item.id === branchId && item.is_active) ||
+			!departments.some((item) => item.id === departmentId && item.is_active)
+		) {
 			setMessage("Choose a branch and department.");
 			return;
 		}
@@ -143,25 +148,41 @@ export function DirectoryManagement({
 				? departments.find((item) => item.id === id)?.name
 				: staffRows.find((item) => item.id === id)?.full_name;
 		if (isActive) {
-			const result = table === "departments"
-				? await supabase.from("staff").select("id", { count: "exact", head: true }).eq("department_id", id).eq("is_active", true)
-				: await supabase.from("visits").select("id", { count: "exact", head: true })
-					.eq("staff_id", id).in("status", [
-						"pending_reception_review", "pending_host_acknowledgement",
-						"host_approved_awaiting_reception", "approved_on_site",
-					]);
+			const result =
+				table === "departments"
+					? await supabase
+							.from("staff")
+							.select("id", { count: "exact", head: true })
+							.eq("department_id", id)
+							.eq("is_active", true)
+					: await supabase
+							.from("visits")
+							.select("id", { count: "exact", head: true })
+							.eq("staff_id", id)
+							.in("status", [
+								"pending_reception_review",
+								"pending_host_acknowledgement",
+								"host_approved_awaiting_reception",
+								"approved_on_site",
+							]);
 			if (result.error) {
 				setMessage("Unable to check dependencies. Please retry.");
 				return;
 			}
 			if (result.count) {
 				if (table === "staff") {
-					const visits = await supabase.from("visits")
+					const visits = await supabase
+						.from("visits")
 						.select("id,visitor_full_name,status")
-						.eq("staff_id", id).in("status", [
-							"pending_reception_review", "pending_host_acknowledgement",
-							"host_approved_awaiting_reception", "approved_on_site",
-						]).order("arrived_at", { ascending: true }).limit(10);
+						.eq("staff_id", id)
+						.in("status", [
+							"pending_reception_review",
+							"pending_host_acknowledgement",
+							"host_approved_awaiting_reception",
+							"approved_on_site",
+						])
+						.order("arrived_at", { ascending: true })
+						.limit(10);
 					if (visits.data) setBlockingVisits(visits.data);
 					setBlockingBranchId(staffRows.find((item) => item.id === id)?.location_id ?? null);
 				}
@@ -420,15 +441,23 @@ export function DirectoryManagement({
 				</button>
 			</div>
 			{message && (
-				<p role="alert" className={styles.error}>
+				<p role={messageRole(message)} className={messageRole(message) === "alert" ? styles.error : undefined}>
 					{message}
 				</p>
 			)}
 			{blockingVisits.length > 0 && (
 				<div>
 					<p>Active visits assigned to this host:</p>
-					<ul>{blockingVisits.map((visit) => <li key={visit.id}>{visit.visitor_full_name} · {visit.status.replaceAll("_", " ")}</li>)}</ul>
-					{blockingBranchId && <Link href={`/app?branch=${blockingBranchId}`}>Open this branch’s reception queue</Link>}
+					<ul>
+						{blockingVisits.map((visit) => (
+							<li key={visit.id}>
+								{visit.visitor_full_name} · {visit.status.replaceAll("_", " ")}
+							</li>
+						))}
+					</ul>
+					{blockingBranchId && (
+						<Link href={`/app?branch=${blockingBranchId}`}>Open this branch’s reception queue</Link>
+					)}
 				</div>
 			)}
 		</section>

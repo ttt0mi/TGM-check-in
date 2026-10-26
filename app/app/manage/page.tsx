@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { Management } from "@/features/admin/Management";
 import { Unavailable } from "@/features/shared/Unavailable";
 
+export const metadata = { title: "Administration", description: "Manage branches, staff and access." };
+
 export default async function ManagePage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
 	const requestedTab = (await searchParams).tab;
 	const tab =

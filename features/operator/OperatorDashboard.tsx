@@ -5,6 +5,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
+import { useOnlineStatus } from "@/lib/hooks/use-online-status";
 import { AssistedForm } from "./AssistedForm";
 import { VisitQueue } from "./VisitQueue";
 import { useVisits } from "./useVisits";
@@ -93,6 +94,7 @@ function DashboardContent({
 	const [assistedBranch, setAssistedBranch] = useState<Branch | null>(null);
 	const showAssisted = assistedBranch !== null;
 	const [search, setSearch] = useState("");
+	const online = useOnlineStatus();
 	const branch = branches.find((item) => item.id === branchId);
 	const access = useAccessWatch({ role, organizationId: organization.id, branchId });
 	const visits = useVisits(branchId || null, search);
@@ -117,6 +119,11 @@ function DashboardContent({
 				</nav>
 			</header>
 			<div className={styles.content}>
+				{!online && (
+					<p role="status" className={styles.connection}>
+						You appear to be offline. Existing visits remain visible; retry actions after reconnecting.
+					</p>
+				)}
 				{directory.error && (
 					<p role="status" className={styles.connection}>
 						Branch and host choices may be out of date.{" "}
@@ -170,7 +177,7 @@ function DashboardContent({
 								staff={staff.filter((item) => item.location_id === assistedBranch.id)}
 								onCreated={() => {
 									setAssistedBranch(null);
-									void visits.refresh();
+									visits.refreshSoon();
 								}}
 								onCancel={() => setAssistedBranch(null)}
 							/>
@@ -190,7 +197,11 @@ function DashboardContent({
 				) : (
 					<p>
 						No active branch is available.{" "}
-						{role === "admin" ? "Create one in Manage." : "Ask an administrator for an assignment."}
+						{role === "admin" ? (
+							<Link href="/app/manage?tab=branches">Create a branch in Manage.</Link>
+						) : (
+							"Ask an administrator for an assignment."
+						)}
 					</p>
 				)}
 			</div>

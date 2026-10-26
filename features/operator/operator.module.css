@@ -2,6 +2,7 @@
 	min-height: 100vh;
 	background: #f5f6f8;
 	color: #17263a;
+	overflow-wrap: anywhere;
 }
 .header {
 	display: flex;
@@ -27,6 +28,11 @@
 	flex-wrap: wrap;
 	align-items: center;
 	gap: 18px;
+}
+.header nav a {
+	display: inline-flex;
+	min-height: 44px;
+	align-items: center;
 }
 .header a {
 	color: #1e3858;
@@ -84,6 +90,42 @@
 	border: 1px solid #cbd5e0;
 	border-radius: 7px;
 	background: white;
+}
+
+.correctionDialog {
+	width: min(100% - 2rem, 34rem);
+	max-height: min(90dvh, 50rem);
+	padding: 1.5rem;
+	border: 1px solid #9faec1;
+	border-radius: 12px;
+	color: #17263a;
+	background: white;
+	overflow: auto;
+}
+.correctionDialog::backdrop {
+	background: #17263a99;
+}
+.correctionDialog form,
+.correctionDialog label {
+	display: grid;
+	gap: 0.5rem;
+}
+.correctionDialog form {
+	gap: 1rem;
+	margin-block: 1rem;
+}
+.correctionDialog input,
+.correctionDialog textarea {
+	width: 100%;
+	min-height: 44px;
+	padding: 0.65rem;
+	border: 1px solid #9faec1;
+	border-radius: 7px;
+}
+.correctionDialog button {
+	min-height: 44px;
+	margin: 0.25rem 0.5rem 0.25rem 0;
+	padding: 0.6rem 0.8rem;
 }
 .visitList {
 	display: grid;
@@ -219,7 +261,7 @@
 }
 .details dl {
 	display: grid;
-	grid-template-columns: 110px 1fr;
+	grid-template-columns: 110px minmax(0, 1fr);
 	gap: 5px 12px;
 	font-size: 13px;
 }

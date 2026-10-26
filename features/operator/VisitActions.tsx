@@ -1,14 +1,35 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/browser";
+import { networkError, requestError, RequestError } from "@/lib/http/request-error";
 import type { Visit } from "./types";
 import styles from "./operator.module.css";
+import { scheduleVisitRefresh } from "./refresh-queue";
+import { branchLocalToIso, formatBranchLocal } from "./branch-time";
+import { useOnlineStatus } from "@/lib/hooks/use-online-status";
 
-export function VisitActions({ visit, role }: { visit: Visit; role: "admin" | "receptionist" }) {
+export function VisitActions({
+	visit,
+	role,
+	timezone,
+}: {
+	visit: Visit;
+	role: "admin" | "receptionist";
+	timezone: string;
+}) {
 	const [busy, setBusy] = useState(false);
+	const online = useOnlineStatus();
 	const [message, setMessage] = useState("");
+	const [failed, setFailed] = useState(false);
+	const [correctionTime, setCorrectionTime] = useState("");
+	const [correctionReason, setCorrectionReason] = useState("");
+	const [correctionError, setCorrectionError] = useState("");
+	const [reviewing, setReviewing] = useState(false);
+	const [dialogOpen, setDialogOpen] = useState(false);
+	const dialog = useRef<HTMLDialogElement | null>(null);
+	const opener = useRef<HTMLButtonElement | null>(null);
 	const queryClient = useQueryClient();
 	const actions: { label: string; action: string }[] = [];
 	if (visit.status === "pending_reception_review") {
@@ -28,62 +49,191 @@ export function VisitActions({ visit, role }: { visit: Visit; role: "admin" | "r
 		actions.push({ label: "Correct checkout", action: "correct_checkout" });
 	}
 
-	async function perform(action: string) {
-		let patch: Record<string, unknown> | undefined;
-		if (action === "correct_checkout") {
-			const reason = window.prompt("Reason for correction (required)")?.trim();
-			if (!reason) return;
-			const enteredTime = window.prompt(
-				"Checkout time (ISO 8601, including time zone)",
-				visit.time_out ?? new Date().toISOString(),
-			);
-			if (!enteredTime) return;
-			const time = new Date(enteredTime);
-			if (Number.isNaN(time.getTime())) {
-				setMessage("Enter a valid checkout time including its time zone.");
-				return;
-			}
-			patch = { reason, time_out: time.toISOString() };
+	function openCorrection(button: HTMLButtonElement) {
+		opener.current = button;
+		setCorrectionTime(formatBranchLocal(visit.time_out ?? new Date().toISOString(), timezone));
+		setCorrectionReason("");
+		setCorrectionError("");
+		setReviewing(false);
+		setDialogOpen(true);
+		dialog.current?.showModal();
+	}
+
+	async function perform(action: string, patch?: Record<string, unknown>): Promise<boolean> {
+		if (!online) {
+			setMessage("You appear to be offline. Reconnect and retry this action.");
+			setFailed(true);
+			return false;
 		}
+		if (
+			action === "cancel" &&
+			!window.confirm(
+				`Cancel the visit for ${visit.visitor_preferred_name || visit.visitor_full_name}? The visitor cannot continue this visit.`,
+			)
+		)
+			return false;
 		setBusy(true);
 		setMessage("");
+		setFailed(false);
 		try {
 			const supabase = createClient();
 			const endpoint = action === "notify" ? "send-host-email" : "reception-visit-action";
-			const { error } = await supabase.functions.invoke(endpoint, {
+			const timeout = AbortSignal.timeout(action === "notify" ? 30000 : 20000);
+			const { error, response } = await supabase.functions.invoke(endpoint, {
 				body:
 					action === "notify"
 						? { visit_id: visit.id }
 						: { visit_id: visit.id, action, ...(patch ? { patch } : {}) },
+				signal: timeout,
 			});
-			if (error) throw error;
+			if (timeout.aborted) throw new RequestError("unavailable", null, "Request timed out.");
+			if (error) throw response ? await requestError(response.clone()) : networkError();
 			if (action === "review") {
+				const emailTimeout = AbortSignal.timeout(30000);
 				const sent = await supabase.functions.invoke("send-host-email", {
 					body: { visit_id: visit.id },
+					signal: emailTimeout,
 				});
-				if (sent.error) setMessage("Review saved. Host email needs a retry.");
-				else setMessage("Host notified.");
+				if (emailTimeout.aborted || sent.error) {
+					setMessage("Review saved. Host email outcome is unclear; check delivery history before retrying.");
+					setFailed(true);
+				} else setMessage("Host notified.");
 			} else setMessage("Visit updated.");
-			await Promise.all([
-				queryClient.invalidateQueries({ queryKey: ["visit-queue", visit.location_id] }),
-				queryClient.invalidateQueries({ queryKey: ["visit-queue-counts", visit.location_id] }),
-				queryClient.invalidateQueries({ queryKey: ["visit-events", visit.id] }),
-			]);
+			scheduleVisitRefresh(queryClient, visit.location_id);
+			await queryClient.invalidateQueries({ queryKey: ["visit-events", visit.id] });
+			return true;
 		} catch (cause) {
-			setMessage(cause instanceof Error ? cause.message : "Action failed.");
+			setMessage(
+				action === "notify"
+					? "Email outcome is unclear. Check delivery history before retrying."
+					: cause instanceof RequestError && cause.status !== null
+						? `${cause.message}${cause.correlationId ? ` Reference: ${cause.correlationId}.` : ""}`
+						: "Action could not be confirmed. Refresh the queue before retrying.",
+			);
+			setFailed(true);
+			return false;
 		} finally {
 			setBusy(false);
 		}
 	}
 
+	function reviewCorrection(event: FormEvent<HTMLFormElement>) {
+		event.preventDefault();
+		const iso = branchLocalToIso(correctionTime, timezone);
+		if (!iso) {
+			setCorrectionError("Enter a valid, unambiguous branch-local date and time.");
+			return;
+		}
+		if (
+			new Date(iso).getTime() > Date.now() ||
+			new Date(iso).getTime() < new Date(visit.admitted_at ?? visit.arrived_at).getTime()
+		) {
+			setCorrectionError("Checkout must be after arrival or admission and cannot be in the future.");
+			return;
+		}
+		if (!correctionReason.trim() || correctionReason.trim().length > 500) {
+			setCorrectionError("Enter a reason of up to 500 characters.");
+			return;
+		}
+		setCorrectionError("");
+		setReviewing(true);
+		requestAnimationFrame(() => dialog.current?.querySelector<HTMLButtonElement>("button")?.focus());
+	}
+
+	async function confirmCorrection() {
+		const iso = branchLocalToIso(correctionTime, timezone);
+		if (!iso) {
+			setReviewing(false);
+			return;
+		}
+		if (await perform("correct_checkout", { reason: correctionReason.trim(), time_out: iso }))
+			dialog.current?.close();
+	}
+
 	return (
 		<div className={styles.actions}>
 			{actions.map(({ label, action }) => (
-				<button key={action} disabled={busy} onClick={() => void perform(action)}>
+				<button
+					key={action}
+					disabled={busy || !online}
+					onClick={(event) =>
+						action === "correct_checkout" ? openCorrection(event.currentTarget) : void perform(action)
+					}
+				>
 					{label}
 				</button>
 			))}
-			{message && <span role="status">{message}</span>}
+			{message && !dialogOpen && <span role={failed ? "alert" : "status"}>{message}</span>}
+			<dialog
+				ref={dialog}
+				className={styles.correctionDialog}
+				aria-labelledby="correction-heading"
+				onClose={() => {
+					setDialogOpen(false);
+					opener.current?.focus();
+				}}
+			>
+				<h2 id="correction-heading">Correct checkout</h2>
+				<p>
+					Visitor: <strong>{visit.visitor_preferred_name || visit.visitor_full_name}</strong>
+				</p>
+				<p>Branch time zone: {timezone}</p>
+				<p>
+					Recorded checkout:{" "}
+					{visit.time_out
+						? new Intl.DateTimeFormat("en-NG", {
+								timeZone: timezone,
+								dateStyle: "medium",
+								timeStyle: "short",
+							}).format(new Date(visit.time_out))
+						: "Not yet checked out"}
+				</p>
+				{reviewing ? (
+					<div>
+						<p>
+							New checkout:{" "}
+							<strong>
+								{correctionTime.replace("T", " ")} ({timezone})
+							</strong>
+						</p>
+						<p>Reason: {correctionReason.trim()}</p>
+						<p>This changes the recorded checkout and creates an audit event.</p>
+						<button disabled={busy || !online} onClick={() => void confirmCorrection()}>
+							{busy ? "Saving…" : "Confirm correction"}
+						</button>
+						<button disabled={busy} onClick={() => setReviewing(false)}>
+							Edit
+						</button>
+					</div>
+				) : (
+					<form onSubmit={reviewCorrection}>
+						<label>
+							Corrected date and time ({timezone}){" "}
+							<input
+								type="datetime-local"
+								required
+								value={correctionTime}
+								onChange={(event) => setCorrectionTime(event.target.value)}
+							/>
+						</label>
+						<label>
+							Reason for correction{" "}
+							<textarea
+								required
+								maxLength={500}
+								value={correctionReason}
+								onChange={(event) => setCorrectionReason(event.target.value)}
+							/>
+						</label>
+						<button type="submit">Review correction</button>
+					</form>
+				)}
+				{correctionError && <p role="alert">{correctionError}</p>}
+				{failed && message && <p role="alert">{message}</p>}
+				<button disabled={busy} onClick={() => dialog.current?.close()}>
+					Cancel
+				</button>
+			</dialog>
 		</div>
 	);
 }

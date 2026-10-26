@@ -76,8 +76,57 @@ test("check-in and login surfaces have no serious accessibility violations", asy
 	const checkIn = await new AxeBuilder({ page }).analyze();
 	expect(checkIn.violations.filter((issue) => ["critical", "serious"].includes(issue.impact ?? ""))).toEqual([]);
 	await page.goto("/login");
+	await expect(page).toHaveTitle("Sign in | TGM Check-in");
+	await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);
 	const login = await new AxeBuilder({ page }).analyze();
 	expect(login.violations.filter((issue) => ["critical", "serious"].includes(issue.impact ?? ""))).toEqual([]);
+});
+
+test("public and host pages reflow at phone and tablet widths", async ({ page }) => {
+	for (const width of [320, 390, 768, 1200]) {
+		await page.setViewportSize({ width, height: 760 });
+		for (const [path, heading] of [
+			[route, "Welcome to Lagos Branch"],
+			["/login", "Sign in"],
+			["/host-decision", "Visitor request"],
+		]) {
+			await page.goto(path);
+			await expect(page.getByRole("heading", { name: heading })).toBeVisible();
+			await expect(page.locator("#main-content")).toHaveCount(1);
+			const overflow = await page.evaluate(
+				() => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+			);
+			expect(overflow, `${path} at ${width}px`).toBeLessThanOrEqual(1);
+		}
+	}
+});
+
+test("validation moves focus to the first invalid visitor field", async ({ page }) => {
+	await page.goto(route);
+	await page.getByRole("button", { name: "Check in", exact: true }).click();
+	await expect(page.getByLabel("Full name")).toBeFocused();
+	await expect(page.getByRole("alert").filter({ hasText: "Please correct" })).toBeVisible();
+});
+
+test("visitor form reflows at a simulated 200 percent zoom and keeps primary controls touch sized", async ({
+	page,
+}) => {
+	await page.setViewportSize({ width: 640, height: 800 });
+	await page.goto(route);
+	await expect(page.getByRole("heading", { name: "Welcome to Lagos Branch" })).toBeVisible();
+	for (const name of ["12-hour", "24-hour", "Stopwatch", "Check in"]) {
+		const height = await page
+			.getByRole("button", { name, exact: name === "Check in" })
+			.evaluate((element) => element.getBoundingClientRect().height);
+		expect(height, `${name} touch target`).toBeGreaterThanOrEqual(44);
+	}
+	await page.evaluate(() => {
+		document.documentElement.style.zoom = "2";
+	});
+	const overflow = await page.evaluate(
+		() => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+	);
+	expect(overflow).toBeLessThanOrEqual(1);
 });
 
 test("clock swipes through the three views in both directions", async ({ page }) => {
@@ -118,6 +167,9 @@ test("host preview survives refresh and requires confirmation", async ({ page, r
 	await expect(page.getByText("Host Visitor")).toBeVisible();
 	await page.getByRole("button", { name: "Approve visit" }).click();
 	await expect(page.getByText("Approve this visitor request?")).toBeVisible();
+	await page.getByRole("button", { name: "Cancel" }).click();
+	await expect(page.getByRole("button", { name: "Approve visit" })).toBeFocused();
+	await page.getByRole("button", { name: "Approve visit" }).click();
 	await page.getByRole("button", { name: "Confirm approval" }).click();
 	await expect(page.getByText("Approved. Reception will admit the visitor.")).toBeVisible();
 	await page.reload();

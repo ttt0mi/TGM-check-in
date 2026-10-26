@@ -5,8 +5,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { RequestError } from "@/lib/http/request-error";
+import { useOnlineStatus } from "@/lib/hooks/use-online-status";
 import { BranchClock } from "./BranchClock";
-import { getPublicDirectory, getVisitorVisit, submitPublicVisit } from "./api";
+import { getPublicDirectory, submitPublicVisit } from "./api";
 import { clearVisitorToken, createVisitorToken, loadVisitorToken, saveVisitorToken } from "./session";
 import { publicVisitSchema, visitTypes, type PublicVisitValues } from "./schema";
 import type { PublicDirectory, VisitorVisit } from "./types";
@@ -49,6 +50,8 @@ export function PublicCheckIn({
 	const [currentDirectory, setCurrentDirectory] = useState(directory);
 	const [directoryError, setDirectoryError] = useState("");
 	const [statusNotice, setStatusNotice] = useState("");
+	const online = useOnlineStatus();
+	const formHeading = useRef<HTMLHeadingElement | null>(null);
 	const pending = useRef<{ idempotencyKey: string; token: string } | null>(null);
 	const turnstile = useRef<TurnstileInstance | null>(null);
 	const form = useForm<PublicVisitValues>({
@@ -136,16 +139,11 @@ export function PublicCheckIn({
 				active = false;
 			};
 		}
-		void getVisitorVisit(saved)
-			.then(() => {
-				if (active) setSessionToken(saved);
-			})
-			.catch(() => {
-				clearVisitorToken(slug);
-			})
-			.finally(() => {
-				if (active) setRestoring(false);
-			});
+		queueMicrotask(() => {
+			if (!active) return;
+			setSessionToken(saved);
+			setRestoring(false);
+		});
 		return () => {
 			active = false;
 		};
@@ -191,7 +189,13 @@ export function PublicCheckIn({
 			setSessionToken(credentials.token);
 			pending.current = null;
 		} catch (cause) {
-			setError(cause instanceof Error ? cause.message : "Unable to submit. Please try again.");
+			setError(
+				cause instanceof RequestError && cause.kind === "timeout"
+					? "We could not confirm this check-in. Retry with the same details; the visit will not be duplicated."
+					: cause instanceof Error
+						? cause.message
+						: "Unable to submit. Please try again.",
+			);
 			setCaptchaMessage("Verification needs to be completed again before retrying.");
 			// A new challenge may be needed after Siteverify consumes a token.
 			turnstile.current?.reset();
@@ -228,6 +232,11 @@ export function PublicCheckIn({
 						</button>
 					</p>
 				)}
+				{!online && (
+					<p role="status">
+						You appear to be offline. Your entries remain here; reconnect and retry when ready.
+					</p>
+				)}
 				{statusNotice && <p role="status">{statusNotice}</p>}
 				{restoring ? (
 					<p>Checking for your visit…</p>
@@ -248,6 +257,7 @@ export function PublicCheckIn({
 								setClockVisit(null);
 								setStorageLimited(false);
 								form.reset();
+								requestAnimationFrame(() => formHeading.current?.focus());
 							}}
 						>
 							Check in another visitor
@@ -257,11 +267,16 @@ export function PublicCheckIn({
 					<form
 						className={styles.form}
 						onSubmit={(event) => {
-							void form.handleSubmit(submit)(event);
+							void form.handleSubmit(submit, (errors) => {
+								const first = Object.keys(errors)[0] as keyof PublicVisitValues | undefined;
+								if (first) form.setFocus(first);
+							})(event);
 						}}
 						noValidate
 					>
-						<h2>Tell us about your visit</h2>
+						<h2 ref={formHeading} tabIndex={-1}>
+							Tell us about your visit
+						</h2>
 						{form.formState.isSubmitted && Object.keys(form.formState.errors).length > 0 && (
 							<p role="alert">Please correct the marked fields before checking in.</p>
 						)}
@@ -389,7 +404,7 @@ export function PublicCheckIn({
 								{error}
 							</p>
 						)}
-						<button type="submit" disabled={form.formState.isSubmitting || !captchaToken}>
+						<button type="submit" disabled={form.formState.isSubmitting || !captchaToken || !online}>
 							{form.formState.isSubmitting ? "Submitting…" : "Check in"}
 						</button>
 					</form>

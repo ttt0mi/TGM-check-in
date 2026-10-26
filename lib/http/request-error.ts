@@ -1,5 +1,14 @@
 export type RequestFailureKind =
-	"invalid" | "unauthorized" | "forbidden" | "missing" | "conflict" | "rate_limited" | "unavailable" | "unexpected";
+	| "invalid"
+	| "unauthorized"
+	| "forbidden"
+	| "missing"
+	| "conflict"
+	| "rate_limited"
+	| "unavailable"
+	| "timeout"
+	| "cancelled"
+	| "unexpected";
 
 export class RequestError extends Error {
 	constructor(
@@ -52,4 +61,12 @@ export async function requestError(response: Response): Promise<RequestError> {
 
 export function networkError(): RequestError {
 	return new RequestError("unavailable", null, "Connection unavailable. Check your connection and try again.");
+}
+
+export function timeoutError(): RequestError {
+	return new RequestError("timeout", null, "This request took too long. Check its status before retrying.");
+}
+
+export function cancelledError(): RequestError {
+	return new RequestError("cancelled", null, "Request cancelled.");
 }

@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { RequestError } from "@/lib/http/request-error";
+import { useOnlineStatus } from "@/lib/hooks/use-online-status";
 import { getHostPreview, respondToHostVisit, type HostPreview } from "./api";
 import styles from "@/features/public-check-in/public-check-in.module.css";
 
@@ -33,6 +34,23 @@ export function HostDecision() {
 	const [busy, setBusy] = useState(false);
 	const [message, setMessage] = useState("");
 	const [retryCounter, setRetryCounter] = useState(0);
+	const online = useOnlineStatus();
+	const decisionOpener = useRef<"approved" | "declined" | null>(null);
+	const approveButton = useRef<HTMLButtonElement | null>(null);
+	const declineButton = useRef<HTMLButtonElement | null>(null);
+	const review = useRef<HTMLDivElement | null>(null);
+	const heading = useRef<HTMLHeadingElement | null>(null);
+
+	useEffect(() => {
+		if (confirmation) review.current?.focus();
+	}, [confirmation]);
+
+	function cancelConfirmation() {
+		setConfirmation(null);
+		requestAnimationFrame(() =>
+			(decisionOpener.current === "approved" ? approveButton : declineButton).current?.focus(),
+		);
+	}
 
 	useEffect(() => {
 		let active = true;
@@ -106,11 +124,14 @@ export function HostDecision() {
 					: "The visit was declined.",
 			);
 			setPhase("success");
+			requestAnimationFrame(() => heading.current?.focus());
 			setToken("");
 			clearStoredToken();
 		} catch (cause) {
-			if (cause instanceof RequestError && cause.status === 410) {
+			if (cause instanceof RequestError && (cause.status === 410 || cause.kind === "timeout")) {
 				setConfirmation(null);
+				if (cause.kind === "timeout")
+					setMessage("Decision outcome is uncertain. Checking the link status before another attempt.");
 				setRetryCounter((value) => value + 1);
 			} else {
 				setMessage(cause instanceof Error ? cause.message : "Unable to record your decision. Please retry.");
@@ -126,7 +147,12 @@ export function HostDecision() {
 				<div className={styles.brand}>
 					TGM <span>Host decision</span>
 				</div>
-				<h1>Visitor request</h1>
+				<h1 ref={heading} tabIndex={-1}>
+					Visitor request
+				</h1>
+				{!online && (
+					<p role="status">You appear to be offline. This request remains open; reconnect before deciding.</p>
+				)}
 				{storageLimited && token && (
 					<p role="status">
 						This browser cannot save this link for a refresh. Keep this tab open until you decide.
@@ -173,29 +199,43 @@ export function HostDecision() {
 						</dl>
 						<p>Reception completes admission after approval.</p>
 						{confirmation ? (
-							<div role="group" aria-label="Confirm host decision">
+							<div ref={review} tabIndex={-1} role="group" aria-label="Confirm host decision">
 								<p>
 									{confirmation === "declined"
 										? "Declining ends this visit request. The visitor cannot use this link again."
 										: "Approve this visitor request? Reception will still complete admission."}
 								</p>
-								<button disabled={busy} onClick={() => void decide(confirmation)}>
+								<button disabled={busy || !online} onClick={() => void decide(confirmation)}>
 									{busy
 										? "Recording…"
 										: confirmation === "approved"
 											? "Confirm approval"
 											: "Confirm decline"}
 								</button>
-								<button disabled={busy} onClick={() => setConfirmation(null)}>
+								<button disabled={busy} onClick={cancelConfirmation}>
 									Cancel
 								</button>
 							</div>
 						) : (
 							<div className={styles.actions}>
-								<button disabled={busy} onClick={() => setConfirmation("approved")}>
+								<button
+									ref={approveButton}
+									disabled={busy}
+									onClick={() => {
+										decisionOpener.current = "approved";
+										setConfirmation("approved");
+									}}
+								>
 									Approve visit
 								</button>
-								<button disabled={busy} onClick={() => setConfirmation("declined")}>
+								<button
+									ref={declineButton}
+									disabled={busy}
+									onClick={() => {
+										decisionOpener.current = "declined";
+										setConfirmation("declined");
+									}}
+								>
 									Decline visit
 								</button>
 							</div>

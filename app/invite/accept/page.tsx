@@ -3,6 +3,7 @@ import { AcceptInvite } from "@/features/auth/AcceptInvite";
 import { Unavailable } from "@/features/shared/Unavailable";
 import { frontendEnabled } from "@/lib/feature-flags";
 import { createClient } from "@/lib/supabase/server";
+export const metadata = { title: "Accept invitation", description: "Review and accept your operator invitation." };
 export default async function AcceptInvitePage() {
 	if (!frontendEnabled("auth"))
 		return (

@@ -1,8 +1,11 @@
 import { redirect } from "next/navigation";
+import type { Metadata } from "next";
 import { OperatorDashboard } from "@/features/operator/OperatorDashboard";
 import { Unavailable } from "@/features/shared/Unavailable";
 import { frontendEnabled } from "@/lib/feature-flags";
 import { createClient } from "@/lib/supabase/server";
+
+export const metadata: Metadata = { title: "Reception queue", description: "Manage visits at your reception desk." };
 
 export default async function OperatorPage({ searchParams }: { searchParams: Promise<{ branch?: string }> }) {
 	if (!frontendEnabled("operator"))

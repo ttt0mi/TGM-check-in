@@ -1,11 +1,12 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { createClient } from "@/lib/supabase/browser";
 import { publicVisitSchema, visitTypes, type PublicVisitValues } from "@/features/public-check-in/schema";
 import type { Department, Staff } from "./types";
+import { useOnlineStatus } from "@/lib/hooks/use-online-status";
 import styles from "./operator.module.css";
 
 export function AssistedForm({
@@ -24,7 +25,9 @@ export function AssistedForm({
 	onCancel: () => void;
 }) {
 	const [idempotencyKey, setIdempotencyKey] = useState<string | null>(null);
+	const online = useOnlineStatus();
 	const [error, setError] = useState("");
+	const heading = useRef<HTMLHeadingElement | null>(null);
 	const form = useForm<PublicVisitValues>({
 		resolver: zodResolver(publicVisitSchema),
 		defaultValues: {
@@ -74,8 +77,17 @@ export function AssistedForm({
 	}
 
 	return (
-		<form className={styles.form} onSubmit={form.handleSubmit(submit)} noValidate>
-			<h2>Assisted check-in</h2>
+		<form
+			className={styles.form}
+			onSubmit={form.handleSubmit(submit, (errors) => {
+				const first = Object.keys(errors)[0] as keyof PublicVisitValues | undefined;
+				if (first) form.setFocus(first);
+			})}
+			noValidate
+		>
+			<h2 ref={heading} tabIndex={-1}>
+				Assisted check-in
+			</h2>
 			<p>
 				Branch: <strong>{branchName}</strong>
 			</p>
@@ -83,7 +95,7 @@ export function AssistedForm({
 				Full name <input {...form.register("visitor_full_name")} />
 			</label>
 			{form.formState.errors.visitor_full_name && (
-				<small>{form.formState.errors.visitor_full_name.message}</small>
+				<small role="alert">{form.formState.errors.visitor_full_name.message}</small>
 			)}
 			<label>
 				Preferred name <input {...form.register("visitor_preferred_name")} />
@@ -94,7 +106,9 @@ export function AssistedForm({
 			<label>
 				Phone number <input type="tel" placeholder="+234…" {...form.register("phone_number")} />
 			</label>
-			{form.formState.errors.phone_number && <small>{form.formState.errors.phone_number.message}</small>}
+			{form.formState.errors.phone_number && (
+				<small role="alert">{form.formState.errors.phone_number.message}</small>
+			)}
 			<label>
 				Organization (optional) <input {...form.register("organization")} />
 			</label>
@@ -144,7 +158,24 @@ export function AssistedForm({
 					{error}
 				</p>
 			)}
-			<button disabled={form.formState.isSubmitting}>Create visit</button>
+			<button disabled={form.formState.isSubmitting || !online}>Create visit</button>
+			<button
+				type="button"
+				disabled={form.formState.isSubmitting}
+				onClick={() => {
+					if (
+						form.formState.isDirty &&
+						!window.confirm(`Clear the assisted check-in form for ${branchName}?`)
+					)
+						return;
+					form.reset();
+					setIdempotencyKey(null);
+					setError("");
+					heading.current?.focus();
+				}}
+			>
+				Reset form
+			</button>
 			<button
 				type="button"
 				disabled={form.formState.isSubmitting}

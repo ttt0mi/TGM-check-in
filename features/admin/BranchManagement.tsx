@@ -7,6 +7,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/browser";
 import type { Branch } from "@/features/operator/types";
+import { messageRole } from "@/features/shared/message-role";
 import styles from "./admin.module.css";
 
 const schema = z.object({
@@ -63,15 +64,18 @@ export function BranchManagement({ branches, onChanged }: { branches: Branch[]; 
 				<label>
 					Time zone <input {...form.register("timezone")} placeholder="Africa/Lagos" />
 				</label>
-				<button disabled={form.formState.isSubmitting}>{form.formState.isSubmitting ? "Creating…" : "Create branch"}</button>
+				<button disabled={form.formState.isSubmitting}>
+					{form.formState.isSubmitting ? "Creating…" : "Create branch"}
+				</button>
 			</form>
 			{Object.values(form.formState.errors).map((error, index) => (
 				<p className={styles.error} key={index}>
 					{error.message}
 				</p>
 			))}
-			{message && <p role="status">{message}</p>}
+			{message && <p role={messageRole(message)}>{message}</p>}
 			<ul className={styles.list}>
+				{branches.length === 0 && <li>No branches yet. Use the form above to create the first branch.</li>}
 				{branches.map((branch) => (
 					<li key={branch.id}>
 						<strong>{branch.name}</strong> · {branch.is_active ? "Active" : "Inactive"}
@@ -211,7 +215,10 @@ function BranchEditor({ branch, onChanged }: { branch: Branch; onChanged: () => 
 						/>
 					</label>
 				)}
-				<p>Auto-close runs on the configured schedule in {timezone}; processing may occur after the selected minute.</p>
+				<p>
+					Auto-close runs on the configured schedule in {timezone}; processing may occur after the selected
+					minute.
+				</p>
 				<label>
 					Reception review overdue after (minutes)
 					<input

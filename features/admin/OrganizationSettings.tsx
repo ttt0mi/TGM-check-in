@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/browser";
+import { messageRole } from "@/features/shared/message-role";
 import styles from "./admin.module.css";
 
 export function OrganizationSettings({
@@ -22,7 +23,10 @@ export function OrganizationSettings({
 	const [savingNotice, setSavingNotice] = useState(false);
 	async function save(event: React.FormEvent) {
 		event.preventDefault();
-		if (!name.trim() || name.trim().length > 120) { setMessage("Enter an organization name of at most 120 characters."); return; }
+		if (!name.trim() || name.trim().length > 120) {
+			setMessage("Enter an organization name of at most 120 characters.");
+			return;
+		}
 		setSavingName(true);
 		const { error } = await createClient()
 			.from("organizations")
@@ -63,7 +67,7 @@ export function OrganizationSettings({
 				</label>
 				<button disabled={savingName}>{savingName ? "Saving…" : "Save name"}</button>
 			</form>
-			{message && <p role="status">{message}</p>}
+			{message && <p role={messageRole(message)}>{message}</p>}
 			<h2>Public check-in privacy notice</h2>
 			<p>
 				Public check-in stays unavailable until an organization administrator approves notice copy and a full

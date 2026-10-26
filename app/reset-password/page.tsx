@@ -3,6 +3,7 @@ import { Unavailable } from "@/features/shared/Unavailable";
 import { frontendEnabled } from "@/lib/feature-flags";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+export const metadata = { title: "Reset password", description: "Choose a new password from your recovery link." };
 import { cookies } from "next/headers";
 import { recoveryCookie, validRecoveryIntent } from "@/lib/auth/recovery-intent";
 export default async function ResetPasswordPage() {

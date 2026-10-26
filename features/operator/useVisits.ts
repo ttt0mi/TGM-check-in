@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/browser";
 import type { Visit } from "./types";
+import { clearScheduledVisitRefresh, refreshVisitQueries, scheduleVisitRefresh } from "./refresh-queue";
+import { reportClientFailure } from "@/lib/observability/client";
 
 export const ACTIVE_STATUSES = [
 	"pending_reception_review",
@@ -78,13 +80,14 @@ export function useVisits(branchId: string | null, search: string) {
 		const supabase = createClient();
 		let channel: ReturnType<typeof supabase.channel> | undefined;
 		let mounted = true;
-		let debounce: ReturnType<typeof setTimeout> | undefined;
-		const refresh = () => {
-			if (debounce) clearTimeout(debounce);
-			debounce = setTimeout(() => {
-				void queryClient.invalidateQueries({ queryKey: ["visit-queue", branchId] });
-				void queryClient.invalidateQueries({ queryKey: ["visit-queue-counts", branchId] });
-			}, 500);
+		let reportedFailure = false;
+		const refresh = () => scheduleVisitRefresh(queryClient, branchId);
+		const failure = () => {
+			setConnection({ branchId, status: "fallback" });
+			if (!reportedFailure) {
+				reportedFailure = true;
+				reportClientFailure("operator", "realtime_failure");
+			}
 		};
 		void supabase.realtime
 			.setAuth()
@@ -96,19 +99,20 @@ export function useVisits(branchId: string | null, search: string) {
 					.subscribe((status) => {
 						if (!mounted) return;
 						if (status === "SUBSCRIBED") {
+							reportedFailure = false;
 							setConnection({ branchId, status: "connected" });
 							refresh();
 						} else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
-							setConnection({ branchId, status: "fallback" });
+							failure();
 						}
 					});
 			})
 			.catch(() => {
-				if (mounted) setConnection({ branchId, status: "fallback" });
+				if (mounted) failure();
 			});
 		return () => {
 			mounted = false;
-			if (debounce) clearTimeout(debounce);
+			clearScheduledVisitRefresh(queryClient, branchId);
 			if (channel) void supabase.removeChannel(channel);
 		};
 	}, [branchId, queryClient]);
@@ -123,10 +127,9 @@ export function useVisits(branchId: string | null, search: string) {
 		},
 		counts,
 		connection: connectionStatus,
-		refresh: () =>
-			Promise.all([
-				queryClient.invalidateQueries({ queryKey: ["visit-queue", branchId] }),
-				queryClient.invalidateQueries({ queryKey: ["visit-queue-counts", branchId] }),
-			]),
+		refresh: () => (branchId ? refreshVisitQueries(queryClient, branchId) : Promise.resolve()),
+		refreshSoon: () => {
+			if (branchId) scheduleVisitRefresh(queryClient, branchId);
+		},
 	};
 }

@@ -8,6 +8,7 @@ import { BranchManagement } from "./BranchManagement";
 import { DirectoryManagement } from "./DirectoryManagement";
 import { AccessManagement } from "./AccessManagement";
 import styles from "./admin.module.css";
+import { useOnlineStatus } from "@/lib/hooks/use-online-status";
 
 export function Management({
 	tab,
@@ -25,6 +26,7 @@ export function Management({
 	staff: Staff[];
 }) {
 	const router = useRouter();
+	const online = useOnlineStatus();
 	const refresh = () => router.refresh();
 	return (
 		<main id="main-content" className={styles.page}>
@@ -39,6 +41,12 @@ export function Management({
 					</Link>
 				))}
 			</nav>
+			{!online && (
+				<p role="status">
+					You appear to be offline. Existing records remain visible; changes cannot be confirmed until you
+					reconnect.
+				</p>
+			)}
 			{tab === "organization" && (
 				<OrganizationSettings organization={organization} privacyNotice={privacyNotice} onChanged={refresh} />
 			)}

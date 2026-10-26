@@ -2,6 +2,8 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
+export const metadata = { title: "Getting started", description: "Continue to your TGM workspace." };
+
 export default async function StartPage() {
 	const supabase = await createClient();
 	const {

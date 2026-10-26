@@ -89,6 +89,9 @@ verify_jwt = false
 [functions.get-visitor-visit]
 verify_jwt = false
 
+[functions.log-client-failure]
+verify_jwt = false
+
 # Operator functions require a signed-in user at the gateway as well as the
 # live profile and role checks inside each handler.
 [functions.manage-operator]

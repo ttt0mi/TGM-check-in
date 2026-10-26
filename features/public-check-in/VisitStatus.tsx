@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { getVisitorVisit } from "./api";
 import { terminalStatuses } from "./session";
+import { useOnlineStatus } from "@/lib/hooks/use-online-status";
 import type { VisitorVisit } from "./types";
 import styles from "./public-check-in.module.css";
 
@@ -30,12 +31,15 @@ export function VisitStatus({
 	const [error, setError] = useState("");
 	const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 	const [retryCounter, setRetryCounter] = useState(0);
-	const [online, setOnline] = useState(true);
+	const online = useOnlineStatus();
 
 	useEffect(() => {
 		let active = true;
+		let inFlight = false;
 		let timer: ReturnType<typeof setTimeout> | undefined;
 		async function refresh() {
+			if (inFlight || !navigator.onLine) return;
+			inFlight = true;
 			try {
 				const latest = await getVisitorVisit(token);
 				if (!active) return;
@@ -50,6 +54,8 @@ export function VisitStatus({
 				setError(message);
 				if (message === "Visit unavailable") onUnavailable?.();
 				else timer = setTimeout(refresh, 30000);
+			} finally {
+				inFlight = false;
 			}
 		}
 		function onVisible() {
@@ -59,16 +65,13 @@ export function VisitStatus({
 			}
 		}
 		void refresh();
-		const onOnline = () => setOnline(navigator.onLine);
-		window.addEventListener("online", onOnline);
-		window.addEventListener("offline", onOnline);
+		window.addEventListener("online", onVisible);
 		document.addEventListener("visibilitychange", onVisible);
 		return () => {
 			active = false;
 			if (timer) clearTimeout(timer);
 			document.removeEventListener("visibilitychange", onVisible);
-			window.removeEventListener("online", onOnline);
-			window.removeEventListener("offline", onOnline);
+			window.removeEventListener("online", onVisible);
 		};
 	}, [token, onUnavailable, onVisitChange, retryCounter]);
 

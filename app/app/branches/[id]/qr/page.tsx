@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { PrintableQr } from "@/features/admin/PrintableQr";
 import { Unavailable } from "@/features/shared/Unavailable";
 import { frontendEnabled } from "@/lib/feature-flags";
+
+export const metadata = { title: "Branch QR code", description: "Review and distribute the branch check-in code." };
 import { parseAppOrigin } from "@/supabase/functions/_shared/origin";
 
 export default async function QrPage({ params }: { params: Promise<{ id: string }> }) {

@@ -61,11 +61,22 @@ export class HttpError extends Error {
 	}
 }
 
+export function logContext() {
+	const read = (name: string) => { try { return Deno.env.get(name); } catch { return undefined; } };
+	const environment = read("APP_ENV");
+	const release = read("APP_RELEASE");
+	return {
+		environment: environment && /^(production|staging|development)$/.test(environment) ? environment : "unknown",
+		release: release && /^[a-zA-Z0-9._-]{1,64}$/.test(release) ? release : "unknown",
+	};
+}
+
 export function failure(error: unknown): Response {
 	if (error instanceof HttpError)
 		return json({ error: error.message }, error.status);
-	console.error("TGM Edge Function failed", error);
-	return json({ error: "Server error" }, 500);
+	const correlationId = crypto.randomUUID();
+	console.error(JSON.stringify({ event: "edge_failure", correlation_id: correlationId, category: "unexpected", ...logContext() }));
+	return json({ error: "Server error", correlation_id: correlationId }, 500);
 }
 
 export function requiredText(

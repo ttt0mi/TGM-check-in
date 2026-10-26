@@ -6,6 +6,7 @@ import { useRef, useState } from "react";
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { createClient } from "@/lib/supabase/browser";
 import { networkError, requestError, RequestError } from "@/lib/http/request-error";
+import { reportClientFailure } from "@/lib/observability/client";
 import { reportLabel, reportSchema } from "./report-schema";
 import styles from "./analytics.module.css";
 
@@ -59,17 +60,16 @@ function Content({ role, branches }: { role: "admin" | "receptionist"; branches:
 		refetchOnWindowFocus: false,
 		retry: 1,
 		queryFn: async ({ signal }) => {
+			const timeout = AbortSignal.timeout(30000);
 			const { data, error, response } = await createClient().functions.invoke("get-visit-analytics", {
 				body,
-				signal,
+				signal: AbortSignal.any([signal, timeout]),
 			});
+			if (timeout.aborted) throw new RequestError("timeout", null, "Report request timed out. Please retry.");
 			if (error) throw response ? await requestError(response.clone()) : networkError();
 			const parsed = reportSchema.safeParse(data);
 			if (!parsed.success) {
-				console.error(
-					"Report response mismatch",
-					parsed.error.issues.map((issue) => issue.path.join(".")),
-				);
+				reportClientFailure("operator", "network_failure");
 				throw new Error("Report response is incompatible. Please try again later.");
 			}
 			return parsed.data;
@@ -91,9 +91,13 @@ function Content({ role, branches }: { role: "admin" | "receptionist"; branches:
 		setExportBusy(true);
 		setExportError("");
 		try {
+			const timeout = AbortSignal.timeout(120000);
 			const { data, error, response } = await createClient().functions.invoke("export-visit-report", {
 				body: { ...body, redacted },
+				signal: timeout,
 			});
+			if (timeout.aborted)
+				throw new RequestError("timeout", null, "Export timed out. Check report history before retrying.");
 			if (error) throw response ? await requestError(response.clone()) : networkError();
 			if (typeof data !== "string") throw new Error("Export response is incompatible. Please retry.");
 			const disposition = response?.headers.get("Content-Disposition") ?? "";
@@ -243,9 +247,11 @@ function Content({ role, branches }: { role: "admin" | "receptionist"; branches:
 				<p role="alert">
 					{query.error instanceof RequestError && query.error.kind === "forbidden"
 						? "Report access is unavailable. Your organization or branch assignment may be inactive."
-						: query.error instanceof RequestError && query.error.kind === "unavailable"
-							? "Report service is temporarily unavailable."
-							: "Unable to load report."}{" "}
+						: query.error instanceof RequestError && query.error.kind === "timeout"
+							? query.error.message
+							: query.error instanceof RequestError && query.error.kind === "unavailable"
+								? "Report service is temporarily unavailable."
+								: "Unable to load report."}{" "}
 					<button onClick={() => void query.refetch()}>Retry</button>
 				</p>
 			) : (

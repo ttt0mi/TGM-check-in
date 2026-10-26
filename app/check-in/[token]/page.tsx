@@ -4,6 +4,8 @@ import { Unavailable } from "@/features/shared/Unavailable";
 import { frontendEnabled } from "@/lib/feature-flags";
 import { RequestError } from "@/lib/http/request-error";
 
+export const metadata = { title: "Visitor check-in", description: "Check in at your branch." };
+
 export default async function CheckInPage({ params }: { params: Promise<{ token: string }> }) {
 	if (!frontendEnabled("public"))
 		return <Unavailable title="Check-in is unavailable" detail="Please ask reception to check you in." />;
