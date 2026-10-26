@@ -56,7 +56,7 @@ export default {
 				});
 			if (prepareError) {
 				if (prepareError.code === "P0001")
-					throw new HttpError(409, prepareError.message);
+					throw new HttpError(409, "Host email cannot be sent in the current visit or delivery state", "host_email_conflict");
 				throw prepareError;
 			}
 			let providerStatus: "sent" | "failed" | "unknown" = "failed";

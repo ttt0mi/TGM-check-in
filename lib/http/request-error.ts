@@ -16,6 +16,7 @@ export class RequestError extends Error {
 		public readonly status: number | null,
 		message: string,
 		public readonly correlationId?: string,
+		public readonly code?: string,
 	) {
 		super(message);
 		this.name = "RequestError";
@@ -33,10 +34,23 @@ function kindForStatus(status: number): RequestFailureKind {
 	return "unexpected";
 }
 
-function safeMessage(status: number, supplied: unknown): string {
+function safeMessage(status: number, code: string | undefined): string {
+	const known: Record<string, string> = {
+		invitation_invalid: "This invitation link is invalid or no longer available.",
+		invitation_expired: "This invitation has expired. Ask an administrator for a new one.",
+		invitation_used: "This invitation has already been accepted.",
+		invitation_wrong_email: "Sign in with the email address shown on the invitation.",
+		invitation_unavailable: "The invited organization or branch is unavailable.",
+		organization_unavailable: "Organization signup is not available right now.",
+	};
+	if (code && known[code]) return known[code];
+	if (status === 429) return "Too many attempts. Please wait and try again.";
+	if (status === 401) return "Sign in and try again.";
+	if (status === 403) return "You do not have access to this action.";
+	if (status === 404 || status === 410) return "This item is no longer available.";
+	if (status === 409) return "This action conflicts with the current state. Refresh and try again.";
 	if (status >= 500) return "This service is temporarily unavailable. Please try again.";
-	if (typeof supplied === "string" && supplied.length <= 240 && !/[\r\n<>]/.test(supplied)) return supplied;
-	return status === 429 ? "Too many attempts. Please wait and try again." : "This request could not be completed.";
+	return "Please check the details and try again.";
 }
 
 export async function requestError(response: Response): Promise<RequestError> {
@@ -51,12 +65,34 @@ export async function requestError(response: Response): Promise<RequestError> {
 		typeof data.correlation_id === "string" && /^[a-f0-9-]{36}$/i.test(data.correlation_id)
 			? data.correlation_id
 			: undefined;
+	const code = typeof data.code === "string" && /^[a-z_]{1,64}$/.test(data.code) ? data.code : undefined;
 	return new RequestError(
 		kindForStatus(response.status),
 		response.status,
-		safeMessage(response.status, data.error),
+		safeMessage(response.status, code),
 		id,
+		code,
 	);
+}
+
+export async function functionError(error: unknown, response?: Response): Promise<RequestError> {
+	if (response) return requestError(response.clone());
+	if (error && typeof error === "object" && "context" in error && error.context instanceof Response)
+		return requestError(error.context.clone());
+	return networkError();
+}
+
+export function postgrestError(error: { code: string }): RequestError {
+	if (error.code === "42501")
+		return new RequestError("forbidden", 403, "You do not have access to this action.", undefined, error.code);
+	if (error.code === "23505")
+		return new RequestError("conflict", 409, "A record with these details already exists.", undefined, error.code);
+	if (error.code === "23503" || error.code === "23514" || error.code === "P0001")
+		return new RequestError("conflict", 409, "This change conflicts with a related record or current state.", undefined, error.code);
+	if (/^PGRST00[0-3]$/.test(error.code) || /^08/.test(error.code) || /^53/.test(error.code))
+		return new RequestError("unavailable", 503, "The data service is temporarily unavailable. Please retry.", undefined, error.code);
+	const correlationId = crypto.randomUUID();
+	return new RequestError("unexpected", null, "This request could not be completed.", correlationId, error.code);
 }
 
 export function networkError(): RequestError {

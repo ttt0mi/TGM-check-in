@@ -56,6 +56,7 @@ export class HttpError extends Error {
 	constructor(
 		public status: number,
 		message: string,
+		public code?: string,
 	) {
 		super(message);
 	}
@@ -73,7 +74,7 @@ export function logContext() {
 
 export function failure(error: unknown): Response {
 	if (error instanceof HttpError)
-		return json({ error: error.message }, error.status);
+		return json({ error: error.message, ...(error.code ? { code: error.code } : {}) }, error.status);
 	const correlationId = crypto.randomUUID();
 	console.error(JSON.stringify({ event: "edge_failure", correlation_id: correlationId, category: "unexpected", ...logContext() }));
 	return json({ error: "Server error", correlation_id: correlationId }, 500);

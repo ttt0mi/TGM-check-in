@@ -47,7 +47,7 @@ export default {
                     ["P0001", "23514", "23503"].includes(error.code) ||
 					error.code?.startsWith("22")
 				) {
-					throw new HttpError(400, error.message);
+					throw new HttpError(409, "Visit details or state changed. Refresh the visit and try again", "visit_conflict");
 				}
 				throw error;
 			}

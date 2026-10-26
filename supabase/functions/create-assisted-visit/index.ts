@@ -76,7 +76,7 @@ export default {
 					error.code === "23514" ||
 					error.code === "23503"
 				) {
-					throw new HttpError(400, error.message);
+					throw new HttpError(400, "Visit details are invalid or unavailable", "visit_invalid");
 				}
 				throw error;
 			}

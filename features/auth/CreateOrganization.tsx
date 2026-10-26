@@ -6,6 +6,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
+import { functionError } from "@/lib/http/request-error";
 import styles from "./auth.module.css";
 
 const schema = z.object({ name: z.string().trim().min(1).max(120) });
@@ -20,9 +21,9 @@ export function CreateOrganization({ availability }: { availability: "open" | "d
 	const [error, setError] = useState("");
 	async function submit(values: Values) {
 		setError("");
-		const { error: failure } = await createClient().functions.invoke("register-organization", { body: values });
+		const { error: failure, response } = await createClient().functions.invoke("register-organization", { body: values });
 		if (failure) {
-			setError(failure.message.includes("503") ? "Organization signup is not enabled yet." : failure.message);
+			setError((await functionError(failure, response)).message);
 			return;
 		}
 		router.replace("/start");

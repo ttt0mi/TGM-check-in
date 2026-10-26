@@ -19,7 +19,7 @@ export default {
 			});
 			if (error) {
 				if (error.code === "P0001" || error.code === "23514")
-					throw new HttpError(400, error.message);
+					throw new HttpError(400, "Branch details are invalid or already in use", "branch_invalid");
 				throw error;
 			}
 			return json({ location_id: data }, 201);

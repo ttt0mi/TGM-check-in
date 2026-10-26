@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/browser";
 import type { Visit } from "./types";
 import { clearScheduledVisitRefresh, refreshVisitQueries, scheduleVisitRefresh } from "./refresh-queue";
 import { reportClientFailure } from "@/lib/observability/client";
+import { postgrestError } from "@/lib/http/request-error";
 
 export const ACTIVE_STATUSES = [
 	"pending_reception_review",
@@ -33,7 +34,7 @@ function useVisitGroup(branchId: string | null, status: QueueStatus, search: str
 				p_after_id: pageParam?.id,
 				p_page_size: PAGE_SIZE + 1,
 			});
-			if (error) throw error;
+			if (error) throw postgrestError(error);
 			const rows = (data ?? []) as Visit[];
 			const items = rows.slice(0, PAGE_SIZE);
 			const last = items.at(-1);
@@ -69,7 +70,7 @@ export function useVisits(branchId: string | null, search: string) {
 				p_location_id: branchId,
 				p_search: search || undefined,
 			});
-			if (error) throw error;
+			if (error) throw postgrestError(error);
 			return data as Record<QueueStatus, number>;
 		},
 		refetchInterval: connected ? false : 30000,

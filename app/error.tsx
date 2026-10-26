@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { reportClientFailure } from "@/lib/observability/client";
 
 export default function ErrorPage({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
@@ -25,6 +26,7 @@ export default function ErrorPage({ error, reset }: { error: Error & { digest?: 
 			<p>We could not load this page. Please try again.</p>
 			{correlationId && <p>Reference: {correlationId}</p>}
 			<button onClick={reset}>Try again</button>
+			<Link href="/start">Go to start</Link>
 		</main>
 	);
 }

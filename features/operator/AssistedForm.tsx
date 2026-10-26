@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/browser";
 import { publicVisitSchema, visitTypes, type PublicVisitValues } from "@/features/public-check-in/schema";
 import type { Department, Staff } from "./types";
 import { useOnlineStatus } from "@/lib/hooks/use-online-status";
+import { functionError } from "@/lib/http/request-error";
 import styles from "./operator.module.css";
 
 export function AssistedForm({
@@ -52,7 +53,7 @@ export function AssistedForm({
 		const key = idempotencyKey ?? crypto.randomUUID();
 		setIdempotencyKey(key);
 		setError("");
-		const { error: failure } = await createClient().functions.invoke("create-assisted-visit", {
+		const { error: failure, response } = await createClient().functions.invoke("create-assisted-visit", {
 			body: {
 				location_id: branchId,
 				idempotency_key: key,
@@ -68,7 +69,7 @@ export function AssistedForm({
 			},
 		});
 		if (failure) {
-			setError(failure.message);
+			setError((await functionError(failure, response)).message);
 			return;
 		}
 		setIdempotencyKey(null);
