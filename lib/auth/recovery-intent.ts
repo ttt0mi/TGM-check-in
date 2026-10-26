@@ -6,7 +6,7 @@ const lifetimeSeconds = 600;
 
 function signingKey(): Buffer {
 	const value = process.env.TGM_RECOVERY_INTENT_SECRET;
-	if (!value || value.length < 32) throw new Error("Recovery intent signing secret is unavailable");
+	if (!value || value.length < 32) throw new Error("Recovery intent signing secret is unavailable or too short");
 	return Buffer.from(value, "utf8");
 }
 

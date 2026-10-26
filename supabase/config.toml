@@ -222,14 +222,14 @@ max_indexes = 5
 enabled = true
 # The base URL of your website. Used as an allow-list for redirects and for constructing URLs used
 # in emails.
-site_url = "https://reception.tgmeducation.net"
+site_url = "https://checkin.tgmeducation.net"
 # The public URL that Auth serves on. Defaults to the API external URL with `/auth/v1` appended.
 # external_url = ""
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
 additional_redirect_urls = [
-  "https://reception.tgmeducation.net/auth/callback",
-  "https://reception.tgmeducation.net/auth/callback?next=/reset-password",
-  "https://reception.tgmeducation.net/auth/recover",
+  "https://checkin.tgmeducation.net/auth/callback",
+  "https://checkin.tgmeducation.net/auth/callback?next=/reset-password",
+  "https://checkin.tgmeducation.net/auth/recover",
   "http://localhost:3000/auth/callback",
   "http://localhost:3000/auth/callback?next=/reset-password",
   "http://localhost:3000/auth/recover",
@@ -316,7 +316,7 @@ host = "smtp.resend.com"
 port = 465
 user = "resend"
 pass = "env(RESEND_API_KEY)"
-admin_email = "Frontdesk@tgmeducation.net"
+admin_email = "frontdesk@tgmeducation.net"
 sender_name = "Reception"
 
 # Uncomment to customize email template
@@ -325,7 +325,7 @@ sender_name = "Reception"
 # content_path = "./supabase/templates/invite.html"
 
 [auth.email.template.recovery]
-subject = "Reset your TGM password"
+subject = "Reset your password"
 content_path = "./supabase/templates/recovery.html"
 
 # Uncomment to customize notification email template
