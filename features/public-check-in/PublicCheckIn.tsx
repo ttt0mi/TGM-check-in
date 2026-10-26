@@ -86,7 +86,7 @@ export function PublicCheckIn({
 
 	useEffect(() => {
 		let active = true;
-		async function refreshDirectory() {
+		const refreshDirectory = async () => {
 			try {
 				const updated = await getPublicDirectory(slug, selectedDepartment || undefined);
 				if (!active) return;
