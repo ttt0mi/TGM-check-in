@@ -13,8 +13,8 @@ export default {
 				return json({ state: "invalid" });
 			const hash = await sha256Hex(body.token);
 			const { data, error } = await ctx.supabaseAdmin.rpc(
-				"tgm_preview_operator_invitation" as never,
-				{ p_actor_id: actorId, p_token_hash: `\\x${hash}` } as never,
+				"tgm_preview_operator_invitation",
+				{ p_actor_id: actorId, p_token_hash: `\\x${hash}` },
 			);
 			if (error) throw error;
 			const result = Array.isArray(data) ? data[0] : null;

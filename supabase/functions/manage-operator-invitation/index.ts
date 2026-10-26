@@ -16,14 +16,14 @@ export default {
       const invitationId = uuid(body.invitation_id, "invitation");
       if (body.action !== "resend" && body.action !== "revoke") throw new HttpError(400, "Invalid action");
       if (body.action === "revoke") {
-        const { error } = await operator.service.rpc("tgm_revoke_operator_invitation" as never,
-          { p_actor_id: operator.userId, p_invitation_id: invitationId } as never);
-        if (error) throw new HttpError(409, error.message);
+        const { error } = await operator.service.rpc("tgm_revoke_operator_invitation",
+          { p_actor_id: operator.userId, p_invitation_id: invitationId });
+        if (error) throw new HttpError(409, "Invitation cannot be revoked in its current state", "invitation_conflict");
         return json({ status: "revoked" });
       }
       const config = invitationEmailConfig();
       const { data: list, error: listError } = await operator.service.rpc(
-        "tgm_list_organization_invitations" as never, { p_actor_id: operator.userId } as never);
+        "tgm_list_organization_invitations", { p_actor_id: operator.userId });
       if (listError) throw listError;
       const invitation = (list as Invitation[]).find(item => item.id === invitationId);
       if (!invitation || invitation.accepted_at || invitation.revoked_at) throw new HttpError(409, "Invitation unavailable");
@@ -41,9 +41,9 @@ export default {
       const token = Array.from(crypto.getRandomValues(new Uint8Array(32)),
         byte => byte.toString(16).padStart(2, "0")).join("");
       const tokenHash = `\\x${await sha256Hex(token)}`;
-      const { error: rotateError } = await operator.service.rpc("tgm_rotate_operator_invitation" as never,
-        { p_actor_id: operator.userId, p_invitation_id: invitationId, p_token_hash: tokenHash } as never);
-      if (rotateError) throw new HttpError(409, rotateError.message);
+      const { error: rotateError } = await operator.service.rpc("tgm_rotate_operator_invitation",
+        { p_actor_id: operator.userId, p_invitation_id: invitationId, p_token_hash: tokenHash });
+      if (rotateError) throw new HttpError(409, "Invitation cannot be resent in its current state", "invitation_conflict");
       let status: "sent" | "unknown" = "unknown";
       let providerId: string | null = null;
 	  let errorCode = "provider_outcome_unknown";
@@ -56,9 +56,9 @@ export default {
 		if (delivery.status === "sent") providerId = delivery.providerId;
 		else errorCode = delivery.errorCode;
       } catch { /* A formatting failure after rotation remains unknown. */ }
-      const { error: markError } = await operator.service.rpc("tgm_mark_operator_invitation_delivery" as never,
-        { p_invitation_id: invitationId, p_status: status, p_provider_id: providerId,
-          p_error: status === "unknown" ? errorCode : null } as never);
+      const { error: markError } = await operator.service.rpc("tgm_mark_operator_invitation_delivery",
+        { p_invitation_id: invitationId, p_status: status, p_provider_id: providerId ?? undefined,
+          p_error: status === "unknown" ? errorCode : undefined });
       if (markError) throw markError;
       if (status !== "sent") throw new HttpError(503, "Email outcome is uncertain. Review before resending.");
       return json({ invitation_id: invitationId, delivery_status: status, expires_in_days: 7 });

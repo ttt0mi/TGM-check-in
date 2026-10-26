@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { isSameOriginPost } from "@/lib/http/same-origin";
 import { createClient } from "@/lib/supabase/server";
+import { functionError } from "@/lib/http/request-error";
 
 export async function POST(request: NextRequest) {
 	if (!isSameOriginPost(request)) {
@@ -17,10 +18,13 @@ export async function POST(request: NextRequest) {
 	if (!user?.email_confirmed_at) {
 		return NextResponse.json({ error: "Verify your email first" }, { status: 401 });
 	}
-	const { data, error } = await supabase.functions.invoke("accept-operator-invite", { body: { token } });
-	const response = NextResponse.json(error ? { error: "Invitation could not be accepted" } : data, {
-		status: error ? 409 : 200,
-	});
-	if (!error) response.cookies.delete("tgm_invitation");
+	const { data, error, response: edgeResponse } = await supabase.functions.invoke("accept-operator-invite", { body: { token } });
+	const failure = error ? await functionError(error, edgeResponse) : null;
+	const response = NextResponse.json(
+		failure ? { error: failure.message, code: failure.code } : data,
+		{ status: failure ? failure.status ?? 503 : 200, headers: { "Cache-Control": "no-store" } },
+	);
+	if (!failure || ["invitation_invalid", "invitation_expired", "invitation_used", "invitation_unavailable"].includes(failure.code ?? ""))
+		response.cookies.delete("tgm_invitation");
 	return response;
 }

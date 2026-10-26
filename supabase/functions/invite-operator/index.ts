@@ -47,7 +47,7 @@ export default {
 			});
 			if (error) {
 				if (["P0001", "23514", "23503"].includes(error.code))
-					throw new HttpError(400, error.message);
+					throw new HttpError(409, "Invitation conflicts with an existing account or invitation", "invitation_conflict");
 				throw error;
 			}
 			let status: "sent" | "unknown" = "unknown";
@@ -63,9 +63,9 @@ export default {
 				else errorCode = delivery.errorCode;
 			} catch { /* A formatting failure after token creation remains unknown. */ }
 			const { error: deliveryError } = await operator.service.rpc(
-				"tgm_mark_operator_invitation_delivery" as never,
-				{ p_invitation_id: data, p_status: status, p_provider_id: providerId,
-					p_error: status === "unknown" ? errorCode : null } as never,
+				"tgm_mark_operator_invitation_delivery",
+				{ p_invitation_id: data, p_status: status, p_provider_id: providerId ?? undefined,
+					p_error: status === "unknown" ? errorCode : undefined },
 			);
 			if (deliveryError) throw deliveryError;
 			if (status !== "sent") throw new HttpError(503, "Invitation created; email outcome is uncertain. Review before resending.");
