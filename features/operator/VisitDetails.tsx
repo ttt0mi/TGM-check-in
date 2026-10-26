@@ -8,6 +8,8 @@ import { createClient } from "@/lib/supabase/browser";
 import { publicVisitSchema, visitTypes, type PublicVisitValues } from "@/features/public-check-in/schema";
 import type { Department, Staff, Visit } from "./types";
 import styles from "./operator.module.css";
+import { visitEventLabel, visitTypeLabel } from "@/features/shared/visit-labels";
+import { functionError, postgrestError } from "@/lib/http/request-error";
 
 export function VisitDetails({
 	visit,
@@ -29,7 +31,7 @@ export function VisitDetails({
 				.select("id,event_type,event_source,actor_role,occurred_at")
 				.eq("visit_id", visit.id)
 				.order("occurred_at", { ascending: true });
-			if (error) throw error;
+			if (error) throw postgrestError(error);
 			return data;
 		},
 	});
@@ -83,9 +85,7 @@ export function VisitDetails({
 					{events.data?.map((event) => (
 						<li key={event.id}>
 							<strong>
-								{event.event_type === "visit_edited"
-									? "Visit details edited"
-									: event.event_type.replaceAll("_", " ")}
+								{visitEventLabel(event.event_type)}
 							</strong>{" "}
 							·{" "}
 							{new Intl.DateTimeFormat(undefined, {
@@ -134,6 +134,16 @@ function VisitEditor({
 		name: "department_id",
 	});
 	const canChangeHost = visit.status === "pending_reception_review";
+	function fieldError(name: keyof PublicVisitValues) {
+		const issue = form.formState.errors[name]?.message;
+		return issue ? <small id={`visit-${name}-error`} role="alert">{issue}</small> : null;
+	}
+	function fieldProps(name: keyof PublicVisitValues) {
+		return {
+			"aria-invalid": Boolean(form.formState.errors[name]),
+			"aria-describedby": form.formState.errors[name] ? `visit-${name}-error` : undefined,
+		};
+	}
 	async function save(values: PublicVisitValues) {
 		const patch: Record<string, string | null> = {};
 		for (const field of [
@@ -157,11 +167,11 @@ function VisitEditor({
 			onSaved();
 			return;
 		}
-		const { error: failure } = await createClient().functions.invoke("reception-visit-action", {
+		const { error: failure, response } = await createClient().functions.invoke("reception-visit-action", {
 			body: { visit_id: visit.id, action: "edit", patch },
 		});
 		if (failure) {
-			setError(failure.message);
+			setError((await functionError(failure, response)).message);
 			return;
 		}
 		await Promise.all([
@@ -172,40 +182,51 @@ function VisitEditor({
 		onSaved();
 	}
 	return (
-		<form className={styles.form} onSubmit={form.handleSubmit(save)}>
+		<form className={styles.form} onSubmit={form.handleSubmit(save, (errors) => {
+			const first = Object.keys(errors)[0] as keyof PublicVisitValues | undefined;
+			if (first) form.setFocus(first);
+		})} noValidate>
 			<label>
-				Full name <input {...form.register("visitor_full_name")} />
+				Full name <input {...fieldProps("visitor_full_name")} {...form.register("visitor_full_name")} />
 			</label>
+			{fieldError("visitor_full_name")}
 			<label>
-				Preferred name <input {...form.register("visitor_preferred_name")} />
+				Preferred name <input {...fieldProps("visitor_preferred_name")} {...form.register("visitor_preferred_name")} />
 			</label>
+			{fieldError("visitor_preferred_name")}
 			<label>
-				Email <input type="email" {...form.register("visitor_email")} />
+				Email <input type="email" {...fieldProps("visitor_email")} {...form.register("visitor_email")} />
 			</label>
+			{fieldError("visitor_email")}
 			<label>
-				Phone <input type="tel" {...form.register("phone_number")} />
+				Phone <input type="tel" {...fieldProps("phone_number")} {...form.register("phone_number")} />
 			</label>
+			{fieldError("phone_number")}
 			<label>
-				Organization <input {...form.register("organization")} />
+				Organization <input {...fieldProps("organization")} {...form.register("organization")} />
 			</label>
+			{fieldError("organization")}
 			<label>
 				Visit type{" "}
-				<select {...form.register("visit_type")}>
+				<select {...fieldProps("visit_type")} {...form.register("visit_type")}>
 					{visitTypes.map((type) => (
 						<option key={type} value={type}>
-							{type}
+							{visitTypeLabel(type)}
 						</option>
 					))}
 				</select>
 			</label>
+			{fieldError("visit_type")}
 			<label>
-				Purpose <textarea rows={2} {...form.register("purpose")} />
+				Purpose <textarea rows={2} {...fieldProps("purpose")} {...form.register("purpose")} />
 			</label>
+			{fieldError("purpose")}
 			{canChangeHost && (
 				<>
 					<label>
 						Department{" "}
 						<select
+							{...fieldProps("department_id")}
 							{...form.register("department_id", {
 								onChange: () => form.setValue("staff_id", ""),
 							})}
@@ -218,9 +239,10 @@ function VisitEditor({
 							))}
 						</select>
 					</label>
+					{fieldError("department_id")}
 					<label>
 						Host{" "}
-						<select {...form.register("staff_id")} disabled={!departmentId}>
+						<select {...fieldProps("staff_id")} {...form.register("staff_id")} disabled={!departmentId}>
 							<option value="">None</option>
 							{staff
 								.filter((item) => item.department_id === departmentId)
@@ -231,13 +253,9 @@ function VisitEditor({
 								))}
 						</select>
 					</label>
+					{fieldError("staff_id")}
 				</>
 			)}
-			{Object.values(form.formState.errors).map((issue, index) => (
-				<small key={index} role="alert">
-					{issue.message}
-				</small>
-			))}
 			{error && <p role="alert">{error}</p>}
 			<button disabled={form.formState.isSubmitting}>Save changes</button>
 		</form>

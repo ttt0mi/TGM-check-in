@@ -6,6 +6,7 @@ import { VisitDetails } from "./VisitDetails";
 import type { Branch, Department, Staff, Visit } from "./types";
 import { ACTIVE_STATUSES, type ActiveStatus, useVisits } from "./useVisits";
 import styles from "./operator.module.css";
+import { visitTypeLabel } from "@/features/shared/visit-labels";
 
 const LABELS: Record<ActiveStatus | "history", string> = {
 	pending_reception_review: "Needs reception review",
@@ -80,7 +81,7 @@ export function VisitQueue({
 					<span>{LABELS[visit.status as ActiveStatus] ?? "Completed"}</span>
 				</div>
 				<p>
-					{visit.visit_type} ·{" "}
+					{visitTypeLabel(visit.visit_type)} ·{" "}
 					{new Intl.DateTimeFormat(undefined, {
 						timeZone: branch.timezone,
 						dateStyle: "medium",
@@ -96,13 +97,13 @@ export function VisitQueue({
 							Waiting {minutes} min{threshold !== null && minutes >= threshold ? " · Overdue" : ""}
 						</p>
 					)}
-				<VisitActions visit={visit} role={role} timezone={branch.timezone} />
+				<VisitActions visit={visit} role={role} timezone={branch.timezone} showDelivery={expandedVisitId === visit.id} />
 				<button
 					className={styles.detailsButton}
 					aria-expanded={expandedVisitId === visit.id}
 					onClick={() => setExpandedVisitId(expandedVisitId === visit.id ? null : visit.id)}
 				>
-					{expandedVisitId === visit.id ? "Hide details" : "Details and history"}
+					{expandedVisitId === visit.id ? "Hide details" : visit.status === "pending_host_acknowledgement" ? "Review host email, details and history" : "Details and history"}
 				</button>
 				{expandedVisitId === visit.id && (
 					<VisitDetails

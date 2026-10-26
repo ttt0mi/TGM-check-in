@@ -1,4 +1,5 @@
 "use client";
+import { visitTypeLabel } from "@/features/shared/visit-labels";
 
 import { useEffect, useRef, useState } from "react";
 import { RequestError } from "@/lib/http/request-error";
@@ -187,7 +188,7 @@ export function HostDecision() {
 								</>
 							)}
 							<dt>Visit type</dt>
-							<dd>{preview.visit_type.replaceAll("_", " ")}</dd>
+							<dd>{visitTypeLabel(preview.visit_type)}</dd>
 							<dt>Purpose</dt>
 							<dd>{preview.purpose}</dd>
 							<dt>Branch</dt>

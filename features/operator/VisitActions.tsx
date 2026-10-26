@@ -1,9 +1,10 @@
 "use client";
 
 import { useRef, useState, type FormEvent } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/browser";
-import { networkError, requestError, RequestError } from "@/lib/http/request-error";
+import { functionError, postgrestError, RequestError } from "@/lib/http/request-error";
 import type { Visit } from "./types";
 import styles from "./operator.module.css";
 import { scheduleVisitRefresh } from "./refresh-queue";
@@ -14,10 +15,12 @@ export function VisitActions({
 	visit,
 	role,
 	timezone,
+	showDelivery,
 }: {
 	visit: Visit;
 	role: "admin" | "receptionist";
 	timezone: string;
+	showDelivery: boolean;
 }) {
 	const [busy, setBusy] = useState(false);
 	const online = useOnlineStatus();
@@ -31,6 +34,21 @@ export function VisitActions({
 	const dialog = useRef<HTMLDialogElement | null>(null);
 	const opener = useRef<HTMLButtonElement | null>(null);
 	const queryClient = useQueryClient();
+	const delivery = useQuery({
+		queryKey: ["host-delivery", visit.id],
+		enabled: visit.status === "pending_host_acknowledgement" && showDelivery,
+		queryFn: async () => {
+			const { data, error } = await createClient()
+				.from("host_notification_attempts")
+				.select("status,attempted_at")
+				.eq("visit_id", visit.id)
+				.order("attempted_at", { ascending: false })
+				.limit(1)
+				.maybeSingle();
+			if (error) throw postgrestError(error);
+			return data;
+		},
+	});
 	const actions: { label: string; action: string }[] = [];
 	if (visit.status === "pending_reception_review") {
 		actions.push({
@@ -39,7 +57,9 @@ export function VisitActions({
 		});
 		actions.push({ label: "Cancel", action: "cancel" });
 	} else if (visit.status === "pending_host_acknowledgement") {
-		actions.push({ label: "Retry host email", action: "notify" }, { label: "Cancel", action: "cancel" });
+		if (showDelivery && !delivery.isPending && !delivery.error && (!delivery.data || delivery.data.status === "failed"))
+			actions.push({ label: delivery.data ? "Retry failed host email" : "Send host email", action: "notify" });
+		actions.push({ label: "Cancel", action: "cancel" });
 	} else if (visit.status === "host_approved_awaiting_reception") {
 		actions.push({ label: "Admit visitor", action: "admit" }, { label: "Cancel", action: "cancel" });
 	} else if (visit.status === "approved_on_site") {
@@ -87,7 +107,7 @@ export function VisitActions({
 				signal: timeout,
 			});
 			if (timeout.aborted) throw new RequestError("unavailable", null, "Request timed out.");
-			if (error) throw response ? await requestError(response.clone()) : networkError();
+			if (error) throw await functionError(error, response);
 			if (action === "review") {
 				const emailTimeout = AbortSignal.timeout(30000);
 				const sent = await supabase.functions.invoke("send-host-email", {
@@ -99,10 +119,14 @@ export function VisitActions({
 					setFailed(true);
 				} else setMessage("Host notified.");
 			} else setMessage("Visit updated.");
+			if (action === "review" || action === "notify")
+				await queryClient.invalidateQueries({ queryKey: ["host-delivery", visit.id] });
 			scheduleVisitRefresh(queryClient, visit.location_id);
 			await queryClient.invalidateQueries({ queryKey: ["visit-events", visit.id] });
 			return true;
 		} catch (cause) {
+			if (action === "notify" || action === "review")
+				await queryClient.invalidateQueries({ queryKey: ["host-delivery", visit.id] });
 			setMessage(
 				action === "notify"
 					? "Email outcome is unclear. Check delivery history before retrying."
@@ -152,6 +176,22 @@ export function VisitActions({
 
 	return (
 		<div className={styles.actions}>
+			{visit.status === "pending_host_acknowledgement" && showDelivery && (
+				<div role="status">
+					{delivery.isPending ? "Checking host email delivery…" : delivery.error ? (
+						<>Host email status is unavailable. <button onClick={() => void delivery.refetch()}>Retry status</button></>
+					) : delivery.data ? (
+						<>
+							Host email: {delivery.data.status === "sending" ? "sending or awaiting confirmation" : delivery.data.status}.
+							{" "}Last attempt: {new Intl.DateTimeFormat("en-NG", { timeZone: timezone, dateStyle: "medium", timeStyle: "short" }).format(new Date(delivery.data.attempted_at))} ({timezone}).
+							{delivery.data.status === "unknown" && (
+								role === "admin" ? <> The provider may have accepted the email. Review the <Link href="/app/manage/host-email-recovery">host email recovery procedure</Link> before taking action.</> : " Ask an administrator to review the provider outcome; do not resend blindly."
+							)}
+							{delivery.data.status === "sending" && " Refresh status before considering a retry."}
+						</>
+					) : "Host email has not been sent yet."}
+				</div>
+			)}
 			{actions.map(({ label, action }) => (
 				<button
 					key={action}

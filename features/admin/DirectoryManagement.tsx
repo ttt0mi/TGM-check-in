@@ -7,6 +7,7 @@ import Link from "next/link";
 import type { Branch, Department, Staff } from "@/features/operator/types";
 import { messageRole } from "@/features/shared/message-role";
 import styles from "./admin.module.css";
+import { visitStatusLabel } from "@/features/shared/visit-labels";
 
 const staffDetailsSchema = z.object({
 	full_name: z.string().trim().min(1).max(120),
@@ -451,7 +452,7 @@ export function DirectoryManagement({
 					<ul>
 						{blockingVisits.map((visit) => (
 							<li key={visit.id}>
-								{visit.visitor_full_name} · {visit.status.replaceAll("_", " ")}
+								{visit.visitor_full_name} · {visitStatusLabel(visit.status)}
 							</li>
 						))}
 					</ul>
