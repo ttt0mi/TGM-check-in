@@ -1,7 +1,7 @@
 import { parseAppOrigin } from "./origin.ts";
 
 Deno.test("canonical origin requires HTTPS outside explicit local development", () => {
-	if (parseAppOrigin("https://reception.tgmeducation.net/") !== "https://reception.tgmeducation.net")
+	if (parseAppOrigin("https://checkin.tgmeducation.net/") !== "https://checkin.tgmeducation.net")
 		throw new Error("HTTPS origin was not canonicalized");
 	for (const value of [
 		"http://localhost:3000", "https://example.test/path", "https://example.test/?x=1",
