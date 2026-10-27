@@ -6,10 +6,6 @@ import eslintConfigPrettier from "eslint-config-prettier/flat";
 export default defineConfig([
 	...nextVitals,
 	...nextTypescript,
-	{
-		files: ["app/legacy-home.tsx", "app/check-in/[token]/legacy-check-in.tsx"],
-		rules: { "react-hooks/set-state-in-effect": "off" },
-	},
 	globalIgnores([
 		".next/**",
 		".history/**",
