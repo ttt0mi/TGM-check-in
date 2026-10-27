@@ -118,6 +118,7 @@ jobs:
                     supabase/tests/public_privacy_notice.sql \
                     supabase/tests/host_decision_preview.sql \
                     supabase/tests/reception_queue_pagination.sql \
+                    supabase/tests/operator_directory_pagination.sql \
                     supabase/tests/reporting_aggregation_export.sql \
                     supabase/tests/staff_assignment_integrity.sql \
                     supabase/tests/visit_edit_audit.sql; do
