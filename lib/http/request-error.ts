@@ -88,9 +88,21 @@ export function postgrestError(error: { code: string }): RequestError {
 	if (error.code === "23505")
 		return new RequestError("conflict", 409, "A record with these details already exists.", undefined, error.code);
 	if (error.code === "23503" || error.code === "23514" || error.code === "P0001")
-		return new RequestError("conflict", 409, "This change conflicts with a related record or current state.", undefined, error.code);
+		return new RequestError(
+			"conflict",
+			409,
+			"This change conflicts with a related record or current state.",
+			undefined,
+			error.code,
+		);
 	if (/^PGRST00[0-3]$/.test(error.code) || /^08/.test(error.code) || /^53/.test(error.code))
-		return new RequestError("unavailable", 503, "The data service is temporarily unavailable. Please retry.", undefined, error.code);
+		return new RequestError(
+			"unavailable",
+			503,
+			"The data service is temporarily unavailable. Please retry.",
+			undefined,
+			error.code,
+		);
 	const correlationId = crypto.randomUUID();
 	return new RequestError("unexpected", null, "This request could not be completed.", correlationId, error.code);
 }

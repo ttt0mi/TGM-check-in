@@ -26,7 +26,9 @@ export function AreaError({
 	}, [error]);
 	return (
 		<main id="main-content" className="state-page">
-			<h1 ref={heading} tabIndex={-1}>{title}</h1>
+			<h1 ref={heading} tabIndex={-1}>
+				{title}
+			</h1>
 			<p>This section could not load. Please try again.</p>
 			{reference && <p>Reference: {reference}</p>}
 			<button onClick={reset}>Try again</button>

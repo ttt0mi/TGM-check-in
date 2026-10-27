@@ -84,10 +84,7 @@ export function VisitDetails({
 				<ol>
 					{events.data?.map((event) => (
 						<li key={event.id}>
-							<strong>
-								{visitEventLabel(event.event_type)}
-							</strong>{" "}
-							·{" "}
+							<strong>{visitEventLabel(event.event_type)}</strong> ·{" "}
 							{new Intl.DateTimeFormat(undefined, {
 								timeZone: timezone,
 								dateStyle: "medium",
@@ -136,7 +133,11 @@ function VisitEditor({
 	const canChangeHost = visit.status === "pending_reception_review";
 	function fieldError(name: keyof PublicVisitValues) {
 		const issue = form.formState.errors[name]?.message;
-		return issue ? <small id={`visit-${name}-error`} role="alert">{issue}</small> : null;
+		return issue ? (
+			<small id={`visit-${name}-error`} role="alert">
+				{issue}
+			</small>
+		) : null;
 	}
 	function fieldProps(name: keyof PublicVisitValues) {
 		return {
@@ -182,16 +183,21 @@ function VisitEditor({
 		onSaved();
 	}
 	return (
-		<form className={styles.form} onSubmit={form.handleSubmit(save, (errors) => {
-			const first = Object.keys(errors)[0] as keyof PublicVisitValues | undefined;
-			if (first) form.setFocus(first);
-		})} noValidate>
+		<form
+			className={styles.form}
+			onSubmit={form.handleSubmit(save, (errors) => {
+				const first = Object.keys(errors)[0] as keyof PublicVisitValues | undefined;
+				if (first) form.setFocus(first);
+			})}
+			noValidate
+		>
 			<label>
 				Full name <input {...fieldProps("visitor_full_name")} {...form.register("visitor_full_name")} />
 			</label>
 			{fieldError("visitor_full_name")}
 			<label>
-				Preferred name <input {...fieldProps("visitor_preferred_name")} {...form.register("visitor_preferred_name")} />
+				Preferred name{" "}
+				<input {...fieldProps("visitor_preferred_name")} {...form.register("visitor_preferred_name")} />
 			</label>
 			{fieldError("visitor_preferred_name")}
 			<label>

@@ -253,11 +253,15 @@ export function PublicCheckIn({
 							type="button"
 							onClick={() => {
 								if (
-									(!clockVisit || !["checked_out", "declined", "cancelled", "auto_closed"].includes(clockVisit.status)) &&
+									(!clockVisit ||
+										!["checked_out", "declined", "cancelled", "auto_closed"].includes(
+											clockVisit.status,
+										)) &&
 									!window.confirm(
 										"This visit is still active. Starting another visitor will remove its status from this tablet. The current visitor should keep their own status link or ask reception for updates. Continue?",
 									)
-								) return;
+								)
+									return;
 								clearVisitorToken(slug);
 								setSessionToken(null);
 								setClockVisit(null);

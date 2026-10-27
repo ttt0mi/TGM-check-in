@@ -81,7 +81,11 @@ export function AccessManagement({ branches }: { branches: Branch[] }) {
 		const currentRequest = requestId.current;
 		setBusy("more-operators", true);
 		const { data, error } = await createClient().functions.invoke("operator-directory", {
-			body: { operator_search: operatorSearch, operator_after_email: operatorNextCursor.email, operator_after_id: operatorNextCursor.id },
+			body: {
+				operator_search: operatorSearch,
+				operator_after_email: operatorNextCursor.email,
+				operator_after_id: operatorNextCursor.id,
+			},
 		});
 		setBusy("more-operators", false);
 		if (error) {
@@ -334,8 +338,18 @@ export function AccessManagement({ branches }: { branches: Branch[] }) {
 					onChange={(event) => setOperatorSearchInput(event.target.value)}
 				/>
 			</label>
-			<button onClick={() => operatorSearchInput.trim() === operatorSearch ? void refresh() : setOperatorSearch(operatorSearchInput.trim())}>Search operators</button>
-			<p>{operators.length} operator(s) loaded{operatorNextCursor ? "; more available" : ""}</p>
+			<button
+				onClick={() =>
+					operatorSearchInput.trim() === operatorSearch
+						? void refresh()
+						: setOperatorSearch(operatorSearchInput.trim())
+				}
+			>
+				Search operators
+			</button>
+			<p>
+				{operators.length} operator(s) loaded{operatorNextCursor ? "; more available" : ""}
+			</p>
 			<ul className={styles.list}>
 				{operators.map((item) => (
 					<OperatorRow

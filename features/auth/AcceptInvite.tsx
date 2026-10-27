@@ -46,14 +46,23 @@ export function AcceptInvite({ accountEmail }: { accountEmail: string }) {
 			const response = await fetch("/api/invitation/accept", { method: "POST" });
 			if (!response.ok) {
 				const body = (await response.json()) as { error?: string; code?: string };
-				if (["invitation_invalid", "invitation_expired", "invitation_used", "invitation_unavailable", "invitation_conflict"].includes(body.code ?? ""))
+				if (
+					[
+						"invitation_invalid",
+						"invitation_expired",
+						"invitation_used",
+						"invitation_unavailable",
+						"invitation_conflict",
+					].includes(body.code ?? "")
+				)
 					await loadPreview();
 				throw new Error(
 					body.code === "invitation_wrong_email"
 						? "Sign in with the invited email address shown above."
 						: response.status >= 500
 							? "Unable to reach the invitation service. Your invitation is saved; retry shortly."
-							: body.error ?? "The invitation could not be accepted. Refresh its details or contact an administrator.",
+							: (body.error ??
+								"The invitation could not be accepted. Refresh its details or contact an administrator."),
 				);
 			}
 			router.replace("/start");

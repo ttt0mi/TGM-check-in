@@ -97,13 +97,22 @@ export function VisitQueue({
 							Waiting {minutes} min{threshold !== null && minutes >= threshold ? " · Overdue" : ""}
 						</p>
 					)}
-				<VisitActions visit={visit} role={role} timezone={branch.timezone} showDelivery={expandedVisitId === visit.id} />
+				<VisitActions
+					visit={visit}
+					role={role}
+					timezone={branch.timezone}
+					showDelivery={expandedVisitId === visit.id}
+				/>
 				<button
 					className={styles.detailsButton}
 					aria-expanded={expandedVisitId === visit.id}
 					onClick={() => setExpandedVisitId(expandedVisitId === visit.id ? null : visit.id)}
 				>
-					{expandedVisitId === visit.id ? "Hide details" : visit.status === "pending_host_acknowledgement" ? "Review host email, details and history" : "Details and history"}
+					{expandedVisitId === visit.id
+						? "Hide details"
+						: visit.status === "pending_host_acknowledgement"
+							? "Review host email, details and history"
+							: "Details and history"}
 				</button>
 				{expandedVisitId === visit.id && (
 					<VisitDetails

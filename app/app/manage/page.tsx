@@ -29,35 +29,52 @@ export default async function ManagePage({ searchParams }: { searchParams: Promi
 	if (profileError) throw profileError;
 	if (!profile?.is_active) redirect("/suspended");
 	if (!profile.organization_id || profile.role !== "admin")
-		return <Unavailable title="Administrator access required" detail="Ask an organization administrator to grant access." />;
-	const org = await supabase.from("organizations").select("id,name,is_active").eq("id", profile.organization_id).maybeSingle();
+		return (
+			<Unavailable
+				title="Administrator access required"
+				detail="Ask an organization administrator to grant access."
+			/>
+		);
+	const org = await supabase
+		.from("organizations")
+		.select("id,name,is_active")
+		.eq("id", profile.organization_id)
+		.maybeSingle();
 	if (org.error) throw org.error;
 	if (!org.data?.is_active) redirect("/suspended");
 	const [branches, departments, staff, privacy] = await Promise.all([
-		tab !== "organization" ? supabase
-			.from("locations")
-			.select(
-				"id,name,timezone,public_slug,is_active,auto_close_enabled,auto_close_local_time,address,reception_overdue_minutes,host_overdue_minutes,admission_overdue_minutes",
-			)
-			.eq("organization_id", profile.organization_id)
-			.order("name") : null,
-		tab === "directory" ? supabase
-			.from("departments")
-			.select("id,name,is_active")
-			.eq("organization_id", profile.organization_id)
-			.order("name") : null,
-		tab === "directory" ? supabase
-			.from("staff")
-			.select("id,full_name,preferred_name,department_id,location_id,email,is_active")
-			.eq("organization_id", profile.organization_id)
-			.order("full_name")
-			.order("id")
-			.range(0, 24) : null,
-		tab === "organization" ? supabase
-			.from("organization_privacy_notices")
-			.select("notice_copy,policy_url,approved_at,approved_by")
-			.eq("organization_id", profile.organization_id)
-			.maybeSingle() : null,
+		tab !== "organization"
+			? supabase
+					.from("locations")
+					.select(
+						"id,name,timezone,public_slug,is_active,auto_close_enabled,auto_close_local_time,address,reception_overdue_minutes,host_overdue_minutes,admission_overdue_minutes",
+					)
+					.eq("organization_id", profile.organization_id)
+					.order("name")
+			: null,
+		tab === "directory"
+			? supabase
+					.from("departments")
+					.select("id,name,is_active")
+					.eq("organization_id", profile.organization_id)
+					.order("name")
+			: null,
+		tab === "directory"
+			? supabase
+					.from("staff")
+					.select("id,full_name,preferred_name,department_id,location_id,email,is_active")
+					.eq("organization_id", profile.organization_id)
+					.order("full_name")
+					.order("id")
+					.range(0, 24)
+			: null,
+		tab === "organization"
+			? supabase
+					.from("organization_privacy_notices")
+					.select("notice_copy,policy_url,approved_at,approved_by")
+					.eq("organization_id", profile.organization_id)
+					.maybeSingle()
+			: null,
 	]);
 	if (branches?.error || departments?.error || staff?.error || privacy?.error) {
 		throw branches?.error || departments?.error || staff?.error || privacy?.error;

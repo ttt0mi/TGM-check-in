@@ -21,7 +21,9 @@ export function CreateOrganization({ availability }: { availability: "open" | "d
 	const [error, setError] = useState("");
 	async function submit(values: Values) {
 		setError("");
-		const { error: failure, response } = await createClient().functions.invoke("register-organization", { body: values });
+		const { error: failure, response } = await createClient().functions.invoke("register-organization", {
+			body: values,
+		});
 		if (failure) {
 			setError((await functionError(failure, response)).message);
 			return;

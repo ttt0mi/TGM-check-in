@@ -116,12 +116,16 @@ export function AuthForm({ mode, notice }: { mode: AuthMode; notice?: string }) 
 	}[mode];
 	return (
 		<main id="main-content" className={styles.page}>
-			<form className={styles.card} onSubmit={form.handleSubmit(submit, (errors) => {
-				const first = Object.keys(errors)[0] as keyof AuthValues | undefined;
-				if (first) form.setFocus(first);
-				setMessage("Correct the marked fields and try again.");
-				setIsError(true);
-			})} noValidate>
+			<form
+				className={styles.card}
+				onSubmit={form.handleSubmit(submit, (errors) => {
+					const first = Object.keys(errors)[0] as keyof AuthValues | undefined;
+					if (first) form.setFocus(first);
+					setMessage("Correct the marked fields and try again.");
+					setIsError(true);
+				})}
+				noValidate
+			>
 				<div className={styles.brand}>TGM</div>
 				<h1>{title}</h1>
 				{notice && <p role="alert">{notice}</p>}

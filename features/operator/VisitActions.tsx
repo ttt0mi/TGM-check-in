@@ -57,7 +57,12 @@ export function VisitActions({
 		});
 		actions.push({ label: "Cancel", action: "cancel" });
 	} else if (visit.status === "pending_host_acknowledgement") {
-		if (showDelivery && !delivery.isPending && !delivery.error && (!delivery.data || delivery.data.status === "failed"))
+		if (
+			showDelivery &&
+			!delivery.isPending &&
+			!delivery.error &&
+			(!delivery.data || delivery.data.status === "failed")
+		)
 			actions.push({ label: delivery.data ? "Retry failed host email" : "Send host email", action: "notify" });
 		actions.push({ label: "Cancel", action: "cancel" });
 	} else if (visit.status === "host_approved_awaiting_reception") {
@@ -178,18 +183,44 @@ export function VisitActions({
 		<div className={styles.actions}>
 			{visit.status === "pending_host_acknowledgement" && showDelivery && (
 				<div role="status">
-					{delivery.isPending ? "Checking host email delivery…" : delivery.error ? (
-						<>Host email status is unavailable. <button onClick={() => void delivery.refetch()}>Retry status</button></>
+					{delivery.isPending ? (
+						"Checking host email delivery…"
+					) : delivery.error ? (
+						<>
+							Host email status is unavailable.{" "}
+							<button onClick={() => void delivery.refetch()}>Retry status</button>
+						</>
 					) : delivery.data ? (
 						<>
-							Host email: {delivery.data.status === "sending" ? "sending or awaiting confirmation" : delivery.data.status}.
-							{" "}Last attempt: {new Intl.DateTimeFormat("en-NG", { timeZone: timezone, dateStyle: "medium", timeStyle: "short" }).format(new Date(delivery.data.attempted_at))} ({timezone}).
-							{delivery.data.status === "unknown" && (
-								role === "admin" ? <> The provider may have accepted the email. Review the <Link href="/app/manage/host-email-recovery">host email recovery procedure</Link> before taking action.</> : " Ask an administrator to review the provider outcome; do not resend blindly."
-							)}
+							Host email:{" "}
+							{delivery.data.status === "sending"
+								? "sending or awaiting confirmation"
+								: delivery.data.status}
+							. Last attempt:{" "}
+							{new Intl.DateTimeFormat("en-NG", {
+								timeZone: timezone,
+								dateStyle: "medium",
+								timeStyle: "short",
+							}).format(new Date(delivery.data.attempted_at))}{" "}
+							({timezone}).
+							{delivery.data.status === "unknown" &&
+								(role === "admin" ? (
+									<>
+										{" "}
+										The provider may have accepted the email. Review the{" "}
+										<Link href="/app/manage/host-email-recovery">
+											host email recovery procedure
+										</Link>{" "}
+										before taking action.
+									</>
+								) : (
+									" Ask an administrator to review the provider outcome; do not resend blindly."
+								))}
 							{delivery.data.status === "sending" && " Refresh status before considering a retry."}
 						</>
-					) : "Host email has not been sent yet."}
+					) : (
+						"Host email has not been sent yet."
+					)}
 				</div>
 			)}
 			{actions.map(({ label, action }) => (
