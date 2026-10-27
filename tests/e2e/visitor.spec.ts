@@ -64,6 +64,11 @@ test("a shared tablet can hand off to the next visitor", async ({ page }) => {
 	await page.getByLabel("Purpose").fill("Meeting");
 	await page.getByRole("button", { name: "Check in", exact: true }).click();
 	await expect(page.getByText("Reception is reviewing your visit")).toBeVisible();
+	page.once("dialog", async (dialog) => {
+		expect(dialog.type()).toBe("confirm");
+		expect(dialog.message()).toContain("This visit is still active");
+		await dialog.accept();
+	});
 	await page.getByRole("button", { name: "Check in another visitor" }).click();
 	await expect(page.getByLabel("Full name")).toHaveValue("");
 	await page.reload();
