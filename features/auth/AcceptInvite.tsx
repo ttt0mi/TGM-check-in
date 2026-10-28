@@ -3,6 +3,9 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
+import { fetchWithTimeout } from "@/lib/http/fetch-with-timeout";
+import { RequestError, requestError } from "@/lib/http/request-error";
+import { READ_TIMEOUT_MS } from "@/lib/http/timeout";
 import styles from "./auth.module.css";
 
 type InvitationPreview = {
@@ -25,11 +28,11 @@ export function AcceptInvite({ accountEmail }: { accountEmail: string }) {
 		setLoading(true);
 		setError("");
 		try {
-			const response = await fetch("/api/invitation/preview", { method: "POST" });
-			if (!response.ok) throw new Error("Invitation details are temporarily unavailable. Retry.");
+			const response = await fetchWithTimeout("/api/invitation/preview", { method: "POST" }, READ_TIMEOUT_MS);
+			if (!response.ok) throw await requestError(response);
 			setPreview((await response.json()) as InvitationPreview);
 		} catch (cause) {
-			setError(cause instanceof Error ? cause.message : "Unable to load invitation details.");
+			setError(cause instanceof RequestError ? cause.message : "Unable to load invitation details.");
 		} finally {
 			setLoading(false);
 		}
@@ -43,7 +46,7 @@ export function AcceptInvite({ accountEmail }: { accountEmail: string }) {
 		setBusy(true);
 		setError("");
 		try {
-			const response = await fetch("/api/invitation/accept", { method: "POST" });
+			const response = await fetchWithTimeout("/api/invitation/accept", { method: "POST" });
 			if (!response.ok) {
 				const body = (await response.json()) as { error?: string; code?: string };
 				if (
@@ -56,27 +59,31 @@ export function AcceptInvite({ accountEmail }: { accountEmail: string }) {
 					].includes(body.code ?? "")
 				)
 					await loadPreview();
-				throw new Error(
+				throw new RequestError(
+					"unavailable",
+					response.status,
 					body.code === "invitation_wrong_email"
 						? "Sign in with the invited email address shown above."
 						: response.status >= 500
 							? "Unable to reach the invitation service. Your invitation is saved; retry shortly."
-							: (body.error ??
-								"The invitation could not be accepted. Refresh its details or contact an administrator."),
+							: "The invitation could not be accepted. Refresh its details or contact an administrator.",
 				);
 			}
 			router.replace("/start");
 			router.refresh();
 		} catch (cause) {
-			setError(cause instanceof Error ? cause.message : "Unable to accept invitation.");
+			setError(cause instanceof RequestError ? cause.message : "Unable to accept invitation.");
 		} finally {
 			setBusy(false);
 		}
 	}
 	async function switchAccount() {
-		await createClient().auth.signOut();
-		router.replace("/login");
+		setBusy(true);
+		// Default global revocation is uncertain on transport failure; local session is cleared.
+		const { error } = await createClient().auth.signOut();
+		router.replace(error ? "/login?error=signout-unknown" : "/login");
 		router.refresh();
+		setBusy(false);
 	}
 	const matchesAccount = preview?.invited_email?.toLowerCase() === accountEmail.toLowerCase();
 	return (
@@ -115,7 +122,7 @@ export function AcceptInvite({ accountEmail }: { accountEmail: string }) {
 							{busy ? "Joining…" : "Accept invitation"}
 						</button>
 						{!matchesAccount && (
-							<button className={styles.secondary} onClick={() => void switchAccount()}>
+							<button className={styles.secondary} disabled={busy} onClick={() => void switchAccount()}>
 								Switch account
 							</button>
 						)}

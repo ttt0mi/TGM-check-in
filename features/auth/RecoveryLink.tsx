@@ -1,13 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import styles from "./auth.module.css";
+import { fetchWithTimeout } from "@/lib/http/fetch-with-timeout";
+import { RequestError } from "@/lib/http/request-error";
 
 export function RecoveryLink() {
 	const router = useRouter();
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState("");
+	const mounted = useRef(true);
+	useEffect(() => {
+		mounted.current = true;
+		return () => {
+			mounted.current = false;
+		};
+	}, []);
 	async function continueRecovery() {
 		const fragment = new URLSearchParams(window.location.hash.slice(1));
 		const tokenHash = fragment.get("token_hash");
@@ -18,24 +27,37 @@ export function RecoveryLink() {
 		setBusy(true);
 		setError("");
 		try {
-			const response = await fetch("/api/auth/recover", {
+			const response = await fetchWithTimeout("/api/auth/recover", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({ token_hash: tokenHash }),
 			});
-			if (!response.ok)
+			if (!response.ok) {
+				const body = (await response.json()) as { error?: string };
 				throw new Error(
 					response.status === 410
 						? "This recovery link is invalid or expired. Request a new one."
-						: "Unable to verify this link. Please try again.",
+						: body.error === "auth_timeout"
+							? "Verification may have succeeded. Reopen this link or try signing in before requesting another."
+							: "Unable to verify this link. Please try again.",
 				);
-			window.history.replaceState(null, "", window.location.pathname);
-			router.replace("/reset-password");
-			router.refresh();
+			}
+			if (mounted.current) {
+				window.history.replaceState(null, "", window.location.pathname);
+				router.replace("/reset-password");
+				router.refresh();
+			}
 		} catch (cause) {
-			setError(cause instanceof Error ? cause.message : "Unable to verify this link.");
+			if (mounted.current)
+				setError(
+					cause instanceof RequestError && cause.kind === "timeout"
+						? "Verification may have succeeded. Reopen this link or try signing in before requesting another."
+						: cause instanceof Error
+							? cause.message
+							: "Unable to verify this link.",
+				);
 		} finally {
-			setBusy(false);
+			if (mounted.current) setBusy(false);
 		}
 	}
 	return (

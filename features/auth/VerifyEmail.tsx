@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
 import styles from "./auth.module.css";
+import { authTransportError } from "@/lib/supabase/auth-error";
 
 export function VerifyEmail() {
 	const router = useRouter();
@@ -15,13 +16,19 @@ export function VerifyEmail() {
 	const [busy, setBusy] = useState(false);
 	const [cooldown, setCooldown] = useState(0);
 	const captcha = useRef<TurnstileInstance | null>(null);
+	const mounted = useRef(true);
 	const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 	useEffect(() => {
+		mounted.current = true;
 		void createClient()
 			.auth.getUser()
 			.then(({ data }) => {
-				if (data.user?.email) setEmail(data.user.email);
-			});
+				if (mounted.current && data.user?.email) setEmail(data.user.email);
+			})
+			.catch(() => {});
+		return () => {
+			mounted.current = false;
+		};
 	}, []);
 	useEffect(() => {
 		if (cooldown <= 0) return;
@@ -41,23 +48,34 @@ export function VerifyEmail() {
 				options: { captchaToken, emailRedirectTo: `${window.location.origin}/auth/callback` },
 			});
 			if (error) throw error;
+			if (!mounted.current) return;
 			setCooldown(60);
 			setMessage(
 				"If this address is awaiting verification, a new email is on its way. Check your spam folder too.",
 			);
-		} catch {
+		} catch (cause) {
+			if (!mounted.current) return;
 			setIsError(true);
-			setMessage("Unable to request another email. Check the address and try again shortly.");
+			setMessage(
+				authTransportError(cause)?.kind === "timeout"
+					? "The verification email may already be on its way. Check your inbox before requesting another."
+					: "Unable to request another email. Check the address and try again shortly.",
+			);
 		} finally {
-			setBusy(false);
-			setCaptchaToken("");
-			captcha.current?.reset();
+			if (mounted.current) {
+				setBusy(false);
+				setCaptchaToken("");
+				captcha.current?.reset();
+			}
 		}
 	}
 	async function signOut() {
-		await createClient().auth.signOut();
-		router.replace("/login");
+		setBusy(true);
+		// Global revocation may be uncertain on timeout; Auth JS still clears the local session.
+		const { error } = await createClient().auth.signOut();
+		router.replace(error ? "/login?error=signout-unknown" : "/login");
 		router.refresh();
+		if (mounted.current) setBusy(false);
 	}
 	return (
 		<main id="main-content" className={styles.page}>
@@ -95,7 +113,7 @@ export function VerifyEmail() {
 				<button className={styles.secondary} onClick={() => router.replace("/start")}>
 					I have verified my email
 				</button>
-				<button className={styles.secondary} onClick={() => void signOut()}>
+				<button className={styles.secondary} disabled={busy} onClick={() => void signOut()}>
 					Sign out or use another account
 				</button>
 			</div>

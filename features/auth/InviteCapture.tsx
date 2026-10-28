@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { fetchWithTimeout } from "@/lib/http/fetch-with-timeout";
+import { RequestError } from "@/lib/http/request-error";
 
 export function InviteCapture() {
 	const router = useRouter();
@@ -16,7 +18,7 @@ export function InviteCapture() {
 			queueMicrotask(() => setMessage("This invitation link is missing its token."));
 			return;
 		}
-		void fetch("/api/invitation/preserve", {
+		void fetchWithTimeout("/api/invitation/preserve", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({ token }),
@@ -27,7 +29,7 @@ export function InviteCapture() {
 				router.refresh();
 			})
 			.catch((cause: unknown) =>
-				setMessage(cause instanceof Error ? cause.message : "Unable to save invitation."),
+				setMessage(cause instanceof RequestError ? cause.message : "Unable to save invitation."),
 			);
 	}, [router]);
 	return (

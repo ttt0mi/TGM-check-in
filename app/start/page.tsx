@@ -1,16 +1,14 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { verifiedUser } from "@/lib/supabase/auth-error";
 
 export const metadata = { title: "Getting started", description: "Continue to your TGM workspace." };
 
 export default async function StartPage() {
 	const supabase = await createClient();
-	const {
-		data: { user },
-		error,
-	} = await supabase.auth.getUser();
-	if (error || !user) redirect("/login");
+	const user = await verifiedUser(supabase);
+	if (!user) redirect("/login");
 	if (!user.email_confirmed_at) redirect("/verify-email");
 
 	const { data: profile, error: profileError } = await supabase

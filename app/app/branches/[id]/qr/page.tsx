@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { verifiedUser } from "@/lib/supabase/auth-error";
 import { PrintableQr } from "@/features/admin/PrintableQr";
 import { Unavailable } from "@/features/shared/Unavailable";
 import { frontendEnabled } from "@/lib/feature-flags";
@@ -16,9 +17,7 @@ export default async function QrPage({ params }: { params: Promise<{ id: string 
 			/>
 		);
 	const supabase = await createClient();
-	const {
-		data: { user },
-	} = await supabase.auth.getUser();
+	const user = await verifiedUser(supabase);
 	if (!user) redirect("/login");
 	const { data: profile } = await supabase
 		.from("operator_profiles")

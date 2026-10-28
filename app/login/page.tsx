@@ -9,6 +9,12 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
 	const notice =
 		error === "verification"
 			? "This sign-in link could not be verified. Request a new link or sign in again."
-			: undefined;
+			: error === "auth-unavailable"
+				? "Authentication is temporarily unavailable. Reopen your link or try again shortly."
+				: error === "signout-unknown"
+					? "This device was signed out, but remote session revocation could not be confirmed."
+					: error === "local-signout"
+						? "This device was signed out. Other sessions remain active."
+						: undefined;
 	return <AuthForm mode="login" notice={notice} />;
 }

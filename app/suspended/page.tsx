@@ -8,16 +8,12 @@ import styles from "@/features/auth/auth.module.css";
 export default function SuspendedPage() {
 	const router = useRouter();
 	const [busy, setBusy] = useState(false);
-	const [message, setMessage] = useState("");
 	async function signOut() {
 		setBusy(true);
 		const { error } = await createClient().auth.signOut();
 		setBusy(false);
-		if (error) {
-			setMessage("Unable to sign out. Please try again.");
-			return;
-		}
-		router.replace("/login");
+		// Auth JS clears this device's session even if global revocation is uncertain.
+		router.replace(error ? "/login?error=signout-unknown" : "/login");
 		router.refresh();
 	}
 	return (
@@ -29,7 +25,6 @@ export default function SuspendedPage() {
 					Your account or organization is inactive. Contact an organization administrator or support to
 					restore access.
 				</p>
-				{message && <p role="alert">{message}</p>}
 				<button disabled={busy} onClick={() => void signOut()}>
 					{busy ? "Signing out…" : "Sign out or switch account"}
 				</button>

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { frontendEnabled } from "@/lib/feature-flags";
 import { createClient } from "@/lib/supabase/server";
+import { verifiedUser } from "@/lib/supabase/auth-error";
 import { Management } from "@/features/admin/Management";
 import { Unavailable } from "@/features/shared/Unavailable";
 
@@ -17,9 +18,7 @@ export default async function ManagePage({ searchParams }: { searchParams: Promi
 			<Unavailable title="Management is unavailable" detail="Please contact your organization administrator." />
 		);
 	const supabase = await createClient();
-	const {
-		data: { user },
-	} = await supabase.auth.getUser();
+	const user = await verifiedUser(supabase);
 	if (!user) redirect("/login");
 	const { data: profile, error: profileError } = await supabase
 		.from("operator_profiles")

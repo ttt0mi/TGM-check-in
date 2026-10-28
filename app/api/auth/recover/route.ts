@@ -3,6 +3,7 @@ import { isSameOriginPost } from "@/lib/http/same-origin";
 import { createClient } from "@/lib/supabase/server";
 import { createRecoveryIntent, recoveryCookie, recoveryCookieOptions } from "@/lib/auth/recovery-intent";
 import { frontendEnabled } from "@/lib/feature-flags";
+import { authTransportError } from "@/lib/supabase/auth-error";
 
 export async function POST(request: NextRequest) {
 	if (!frontendEnabled("auth")) return NextResponse.json({ error: "Unavailable" }, { status: 503 });
@@ -18,6 +19,13 @@ export async function POST(request: NextRequest) {
 		return NextResponse.json({ error: "Invalid recovery link" }, { status: 400 });
 	const supabase = await createClient();
 	const { data, error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: "recovery" });
+	const transport = authTransportError(error);
+	if (transport)
+		return NextResponse.json(
+			{ error: transport.kind === "timeout" ? "auth_timeout" : "auth_unavailable" },
+			{ status: 503 },
+		);
+	if (error && (error.status ?? 0) >= 500) return NextResponse.json({ error: "auth_unavailable" }, { status: 503 });
 	if (error || !data.user)
 		return NextResponse.json({ error: "This recovery link is invalid or expired" }, { status: 410 });
 	const response = NextResponse.json({ accepted: true });

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { verifiedUser } from "@/lib/supabase/auth-error";
 import { Unavailable } from "@/features/shared/Unavailable";
 import { frontendEnabled } from "@/lib/feature-flags";
 
@@ -12,9 +13,7 @@ export default async function HostEmailRecoveryPage() {
 			<Unavailable title="Management is unavailable" detail="Please contact your organization administrator." />
 		);
 	const supabase = await createClient();
-	const {
-		data: { user },
-	} = await supabase.auth.getUser();
+	const user = await verifiedUser(supabase);
 	if (!user) redirect("/login");
 	const { data: profile, error } = await supabase
 		.from("operator_profiles")

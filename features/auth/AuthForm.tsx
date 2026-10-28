@@ -8,8 +8,26 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
 import { authFormSchema, passwordRules, type AuthMode, type AuthValues } from "./schema";
 import styles from "./auth.module.css";
+import { fetchWithTimeout } from "@/lib/http/fetch-with-timeout";
+import { RequestError } from "@/lib/http/request-error";
+import { authTransportError } from "@/lib/supabase/auth-error";
+import { useIsMounted } from "@/lib/hooks/use-is-mounted";
 
-function authMessage(cause: unknown): string {
+function authMessage(cause: unknown, mode: AuthMode): string {
+	const transport = authTransportError(cause);
+	if (transport?.kind === "timeout") {
+		if (mode === "signup")
+			return "This is taking longer than expected. Your account may have been created, so check your email before trying again.";
+		if (mode === "recovery")
+			return "This is taking longer than expected. If an email arrives, use that link before requesting another.";
+		if (mode === "reset")
+			return "The update could not be confirmed. Try signing in with your new password before resetting it again.";
+		return "Sign-in took too long. Check your connection and try again.";
+	}
+	if (transport) return transport.message;
+	if (cause instanceof RequestError) return cause.message;
+	if (typeof navigator !== "undefined" && navigator.onLine === false)
+		return "You appear to be offline. Reconnect and try again.";
 	const code = cause && typeof cause === "object" && "code" in cause ? cause.code : null;
 	switch (code) {
 		case "weak_password":
@@ -24,6 +42,10 @@ function authMessage(cause: unknown): string {
 			return "Please wait before requesting another email.";
 		case "recovery_expired":
 			return "Recovery link expired. Request a new one.";
+		case "auth_timeout":
+			return "Verification took too long. Reopen your recovery link before trying again.";
+		case "password_update_unknown":
+			return "The update could not be confirmed. Try signing in with your new password before resetting it again.";
 		default:
 			return "Unable to continue. Please try again.";
 	}
@@ -38,6 +60,7 @@ export function AuthForm({ mode, notice }: { mode: AuthMode; notice?: string }) 
 	const [showPassword, setShowPassword] = useState(false);
 	const [capsLock, setCapsLock] = useState(false);
 	const captcha = useRef<TurnstileInstance | null>(null);
+	const isMounted = useIsMounted();
 	const requiresCaptcha = mode !== "reset";
 	const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 	const form = useForm<AuthValues>({
@@ -66,7 +89,7 @@ export function AuthForm({ mode, notice }: { mode: AuthMode; notice?: string }) 
 					options: { captchaToken, emailRedirectTo: `${window.location.origin}/auth/callback` },
 				});
 				if (error) throw error;
-				router.replace("/verify-email");
+				if (isMounted()) router.replace("/verify-email");
 			} else if (mode === "login") {
 				const { error } = await supabase.auth.signInWithPassword({
 					email: values.email.trim(),
@@ -74,17 +97,20 @@ export function AuthForm({ mode, notice }: { mode: AuthMode; notice?: string }) 
 					options: { captchaToken },
 				});
 				if (error) throw error;
-				router.replace("/start");
-				router.refresh();
+				if (isMounted()) {
+					router.replace("/start");
+					router.refresh();
+				}
 			} else if (mode === "recovery") {
 				const { error } = await supabase.auth.resetPasswordForEmail(values.email.trim(), {
 					captchaToken,
 					redirectTo: `${window.location.origin}/auth/recover`,
 				});
 				if (error) throw error;
-				setMessage("If this account exists, follow the instructions sent to its email address.");
+				if (isMounted())
+					setMessage("If this account exists, follow the instructions sent to its email address.");
 			} else {
-				const response = await fetch("/api/auth/reset-password", {
+				const response = await fetchWithTimeout("/api/auth/reset-password", {
 					method: "POST",
 					headers: { "Content-Type": "application/json" },
 					body: JSON.stringify({ password: values.password }),
@@ -93,14 +119,18 @@ export function AuthForm({ mode, notice }: { mode: AuthMode; notice?: string }) 
 					const body = (await response.json()) as { error?: string };
 					throw { code: body.error };
 				}
-				router.replace("/start");
-				router.refresh();
+				if (isMounted()) {
+					router.replace("/start");
+					router.refresh();
+				}
 			}
 		} catch (cause) {
-			setIsError(true);
-			setMessage(authMessage(cause));
+			if (isMounted()) {
+				setIsError(true);
+				setMessage(authMessage(cause, mode));
+			}
 		} finally {
-			if (requiresCaptcha) {
+			if (isMounted() && requiresCaptcha) {
 				captcha.current?.reset();
 				setCaptchaToken("");
 				setCaptchaMessage("Complete verification to continue.");

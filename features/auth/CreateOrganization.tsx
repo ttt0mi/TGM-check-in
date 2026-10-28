@@ -5,8 +5,8 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/browser";
-import { functionError } from "@/lib/http/request-error";
+import { invokeFunction } from "@/lib/http/invoke-function";
+import { RequestError } from "@/lib/http/request-error";
 import styles from "./auth.module.css";
 
 const schema = z.object({ name: z.string().trim().min(1).max(120) });
@@ -21,11 +21,14 @@ export function CreateOrganization({ availability }: { availability: "open" | "d
 	const [error, setError] = useState("");
 	async function submit(values: Values) {
 		setError("");
-		const { error: failure, response } = await createClient().functions.invoke("register-organization", {
-			body: values,
-		});
-		if (failure) {
-			setError((await functionError(failure, response)).message);
+		try {
+			await invokeFunction("register-organization", values);
+		} catch (cause) {
+			setError(
+				cause instanceof RequestError
+					? cause.message
+					: "Organization creation outcome is unclear. Refresh before retrying.",
+			);
 			return;
 		}
 		router.replace("/start");
