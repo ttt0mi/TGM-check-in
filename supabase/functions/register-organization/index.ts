@@ -18,7 +18,7 @@ export default {
 			});
 			if (error) {
 				if (error.code === "P0001" || error.code === "23514")
-					throw new HttpError(409, error.message);
+					throw new HttpError(409, "Organization creation is unavailable for this account", "organization_unavailable");
 				throw error;
 			}
 			return json({ organization_id: data }, 201);

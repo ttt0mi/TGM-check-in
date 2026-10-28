@@ -5,39 +5,15 @@ import {
 	failure,
 	HttpError,
 	json,
+	logContext,
 	readJson,
 	sha256Hex,
 	uuid,
 } from "../_shared/tgm.ts";
 import type { Database } from "../_shared/database.ts";
-
-function safeOrigin(): string {
-	const url = new URL(env("HOST_DECISION_ORIGIN"));
-	if (
-		url.protocol !== "https:" ||
-		url.username ||
-		url.password ||
-		url.search ||
-		url.hash ||
-		url.pathname !== "/"
-	) {
-		throw new Error("HOST_DECISION_ORIGIN must be an HTTPS origin");
-	}
-	return url.origin;
-}
-
-function htmlEscape(value: string): string {
-	return value.replace(
-		/[&<>"']/g,
-		character => ({
-				"&": "&amp;",
-				"<": "&lt;",
-				">": "&gt;",
-				'"': "&quot;",
-				"'": "&#39;",
-			})[character]!,
-	);
-}
+import { appOrigin } from "../_shared/app-origin.ts";
+import { htmlEscape } from "../_shared/email-format.ts";
+import { sendTransactionalEmail } from "../_shared/email-transport.ts";
 
 export default {
 	fetch: withSupabase<Database>({ auth: "user" }, async (req, ctx) => {
@@ -59,7 +35,7 @@ export default {
 
 			// Missing deployment configuration must never create an attempt or send a
 			// link to an unhosted page. This is intentionally fail-closed for launch.
-			const origin = safeOrigin();
+			const origin = appOrigin();
 			const apiKey = env("RESEND_API_KEY");
 			const from = env("RESEND_FROM_EMAIL");
 			if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(from))
@@ -80,7 +56,7 @@ export default {
 				});
 			if (prepareError) {
 				if (prepareError.code === "P0001")
-					throw new HttpError(409, prepareError.message);
+					throw new HttpError(409, "Host email cannot be sent in the current visit or delivery state", "host_email_conflict");
 				throw prepareError;
 			}
 			let providerStatus: "sent" | "failed" | "unknown" = "failed";
@@ -93,7 +69,7 @@ export default {
 					p_provider_message_id: providerId ?? undefined,
 					p_error_code: errorCode ?? undefined,
 				});
-				if (error) console.error("Could not finalize email attempt", error);
+				if (error) console.error(JSON.stringify({ event: "email_attempt_finalize_failed", correlation_id: crypto.randomUUID(), ...logContext() }));
 			};
 			const [visitResult, attemptResult] = await Promise.all([
 				operator.service
@@ -151,32 +127,21 @@ export default {
 					`<p>Arrival: ${htmlEscape(arrival)}</p>` +
 					`<p><a href="${htmlEscape(decisionUrl.toString())}">Acknowledge or decline this visit</a></p>` +
 					"<p>This single-use link expires at the end of the visit day. Reception must still admit the visitor after approval.</p>",
+				text: `Visitor: ${visit.visitor_full_name}\nVisit type: ${visit.visit_type}\nPurpose: ${visit.purpose}\nArrival: ${arrival}\n\nAcknowledge or decline this visit: ${decisionUrl.toString()}\n\nThis single-use link expires at the end of the visit day. Reception must still admit the visitor after approval.`,
 			};
 			try {
 				// Once the request starts, a timeout or server failure is ambiguous.
 				providerStatus = "unknown";
 				errorCode = "provider_outcome_unknown";
-				const response = await fetch("https://api.resend.com/emails", {
-					method: "POST",
-					headers: {
-						Authorization: `Bearer ${apiKey}`,
-						"Content-Type": "application/json",
-						"Idempotency-Key": `tgm-host-${idempotencyKey}`,
-					},
-					body: JSON.stringify(emailBody),
-				});
-				const result = (await response.json()) as { id?: string };
-				if (response.ok && result.id) {
+				const delivery = await sendTransactionalEmail(apiKey, emailBody, `tgm-host-${idempotencyKey}`);
+				if (delivery.status === "sent") {
 					providerStatus = "sent";
-					providerId = result.id;
+					providerId = delivery.providerId;
 					errorCode = null;
 				} else {
-					// A non-success response does not prove the provider did not accept
-					// the message. Preserve the token and block automatic resends.
-					errorCode = `resend_http_${response.status}`;
+					errorCode = delivery.errorCode;
 				}
-			} catch (error) {
-				console.error("Resend request outcome unknown", error);
+			} catch {
 				errorCode = "provider_outcome_unknown";
 			}
 			const { error: finishError } = await operator.service.rpc(
@@ -201,8 +166,8 @@ export default {
 			if (finalizeOnError) {
 				try {
 					await finalizeOnError();
-				} catch (finalizeError) {
-					console.error("Could not finalize email attempt", finalizeError);
+				} catch {
+					console.error(JSON.stringify({ event: "email_attempt_finalize_failed", correlation_id: crypto.randomUUID(), ...logContext() }));
 				}
 			}
 			return failure(error);

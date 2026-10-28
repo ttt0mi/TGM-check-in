@@ -1,0 +1,280 @@
+.page {
+	min-height: 100vh;
+	background: #f5f6f8;
+	color: #17263a;
+	overflow-wrap: anywhere;
+}
+.header {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+	padding: 16px clamp(20px, 4vw, 54px);
+	background: white;
+	border-bottom: 1px solid #e3e8ef;
+}
+.header > div {
+	display: flex;
+	align-items: center;
+	gap: 16px;
+}
+.brand {
+	color: #1e3858;
+	font-size: 24px;
+}
+.header nav {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 18px;
+}
+.header nav a {
+	display: inline-flex;
+	min-height: 44px;
+	align-items: center;
+}
+.header a {
+	color: #1e3858;
+	font-size: 14px;
+	font-weight: 650;
+}
+.header button,
+.heading button,
+.actions button,
+.form button {
+	padding: 9px 14px;
+	border: 1px solid #1e3858;
+	border-radius: 8px;
+	background: #1e3858;
+	color: white;
+	font-weight: 650;
+	cursor: pointer;
+}
+.content {
+	max-width: 1120px;
+	margin: 0 auto;
+	padding: 32px 20px 70px;
+}
+.heading {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 18px;
+}
+.heading p {
+	margin: 0;
+	color: #c53640;
+	font-size: 12px;
+	font-weight: 700;
+	text-transform: uppercase;
+}
+.heading h1 {
+	margin: 4px 0 22px;
+}
+.branchPicker {
+	display: grid;
+	gap: 6px;
+	max-width: 340px;
+	margin-bottom: 25px;
+	font-size: 13px;
+	font-weight: 650;
+}
+.branchPicker select,
+.form input,
+.form select,
+.form textarea {
+	min-height: 40px;
+	padding: 9px;
+	border: 1px solid #cbd5e0;
+	border-radius: 7px;
+	background: white;
+}
+
+.correctionDialog {
+	width: min(100% - 2rem, 34rem);
+	max-height: min(90dvh, 50rem);
+	padding: 1.5rem;
+	border: 1px solid #9faec1;
+	border-radius: 12px;
+	color: #17263a;
+	background: white;
+	overflow: auto;
+}
+.correctionDialog::backdrop {
+	background: #17263a99;
+}
+.correctionDialog form,
+.correctionDialog label {
+	display: grid;
+	gap: 0.5rem;
+}
+.correctionDialog form {
+	gap: 1rem;
+	margin-block: 1rem;
+}
+.correctionDialog input,
+.correctionDialog textarea {
+	width: 100%;
+	min-height: 44px;
+	padding: 0.65rem;
+	border: 1px solid #9faec1;
+	border-radius: 7px;
+}
+.correctionDialog button {
+	min-height: 44px;
+	margin: 0.25rem 0.5rem 0.25rem 0;
+	padding: 0.6rem 0.8rem;
+}
+.visitList {
+	display: grid;
+	gap: 12px;
+}
+.queueToolbar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: end;
+	gap: 12px;
+	margin-bottom: 8px;
+}
+.queueToolbar label {
+	display: grid;
+	gap: 5px;
+	font-size: 13px;
+	font-weight: 650;
+}
+.queueToolbar input {
+	min-height: 42px;
+	min-width: min(320px, 80vw);
+	padding: 8px;
+	border: 1px solid #9faec1;
+	border-radius: 7px;
+}
+.queueToolbar button,
+.loadMore,
+.historySection > button,
+.queueGroup button {
+	min-height: 42px;
+	padding: 8px 12px;
+	border: 1px solid #1e3858;
+	border-radius: 7px;
+	background: white;
+	color: #1e3858;
+	font-weight: 650;
+	cursor: pointer;
+}
+.connection {
+	font-size: 13px;
+	color: #46566b;
+}
+.queueGroup {
+	margin-top: 28px;
+}
+.queueGroup h2 {
+	font-size: 19px;
+}
+.queueGroup h2 span {
+	color: #46566b;
+}
+.loadMore {
+	margin-top: 14px;
+}
+.historySection {
+	margin-top: 36px;
+	border-top: 1px solid #cbd5e0;
+	padding-top: 24px;
+}
+.overdue {
+	color: #a0252d !important;
+	font-weight: 700;
+}
+.visit {
+	padding: 20px;
+	border: 1px solid #e3e8ef;
+	border-radius: 12px;
+	background: white;
+}
+.visit > div:first-child {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: space-between;
+	gap: 10px;
+}
+.visit span {
+	color: #657182;
+	font-size: 13px;
+	text-transform: capitalize;
+}
+.visit p {
+	margin: 9px 0;
+	color: #657182;
+	font-size: 13px;
+}
+.actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px;
+	margin-top: 16px;
+}
+.actions button {
+	padding: 7px 10px;
+	font-size: 12px;
+}
+.actions button:disabled {
+	opacity: 0.55;
+}
+.form {
+	display: grid;
+	gap: 13px;
+	margin-bottom: 24px;
+	padding: 22px;
+	border-radius: 12px;
+	background: white;
+}
+.form label {
+	display: grid;
+	gap: 5px;
+	font-size: 13px;
+	font-weight: 650;
+}
+.form small,
+.error {
+	color: #b52c39;
+}
+.detailsButton {
+	margin-top: 12px;
+	border: 0;
+	background: transparent;
+	color: #1e3858;
+	text-decoration: underline;
+	cursor: pointer;
+}
+.details {
+	margin-top: 15px;
+	padding-top: 15px;
+	border-top: 1px solid #e3e8ef;
+}
+.details h3 {
+	font-size: 16px;
+}
+.details dl {
+	display: grid;
+	grid-template-columns: 110px minmax(0, 1fr);
+	gap: 5px 12px;
+	font-size: 13px;
+}
+.details dt {
+	color: #657182;
+}
+.details dd {
+	margin: 0;
+}
+.details ol {
+	padding-left: 22px;
+	font-size: 13px;
+}
+.details li {
+	margin: 8px 0;
+}

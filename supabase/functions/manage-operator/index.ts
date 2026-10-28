@@ -55,7 +55,7 @@ export default {
 					error.code === "23503" ||
 					error.code === "23514"
 				) {
-					throw new HttpError(400, error.message);
+					throw new HttpError(409, "Operator assignment conflicts with active access or visits", "operator_conflict");
 				}
 				throw error;
 			}

@@ -1,15 +1,20 @@
-import js from "@eslint/js";
-import globals from "globals";
-import tseslint from "typescript-eslint";
-import { globalIgnores } from "eslint/config";
+import { defineConfig, globalIgnores } from "eslint/config";
+import nextVitals from "eslint-config-next/core-web-vitals";
+import nextTypescript from "eslint-config-next/typescript";
+import eslintConfigPrettier from "eslint-config-prettier/flat";
 
-export default tseslint.config(
-  globalIgnores([".next/**", ".history/**", "out/**", "build/**", "next-env.d.ts"]),
-  {
-    files: ["**/*.{js,mjs,ts,tsx}"],
-    extends: [js.configs.recommended, ...tseslint.configs.recommended],
-    languageOptions: {
-      globals: { ...globals.browser, ...globals.node },
-    },
-  },
-);
+export default defineConfig([
+	...nextVitals,
+	...nextTypescript,
+	globalIgnores([
+		".next/**",
+		".history/**",
+		"out/**",
+		"build/**",
+		"coverage/**",
+		"playwright-report/**",
+		"next-env.d.ts",
+		"supabase/functions/**",
+	]),
+	eslintConfigPrettier,
+]);

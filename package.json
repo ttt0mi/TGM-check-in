@@ -7,28 +7,73 @@
 		"build": "next build",
 		"start": "next start",
 		"lint": "eslint .",
-		"typecheck": "tsc --noEmit --incremental false"
+		"lint:fix": "eslint . --fix",
+		"format:check": "prettier --check .",
+		"format:fix": "prettier --write .",
+		"validate": "npm run format:fix && npm run lint:fix",
+		"typecheck": "tsc -p tsconfig.build.json --noEmit",
+		"typecheck:test": "tsc -p tsconfig.test.json --noEmit",
+		"test:unit": "vitest run",
+		"test:release-coverage": "vitest run features/admin/AccessManagement.test.tsx features/admin/AdminAccessibility.test.tsx features/admin/BranchManagement.test.tsx features/admin/DirectoryManagement.test.tsx features/admin/OrganizationSettings.test.tsx features/admin/PrintableQr.test.tsx features/analytics/AnalyticsDashboard.test.tsx features/auth/AcceptInvite.test.tsx features/auth/AuthForm.test.tsx features/auth/SignOut.test.tsx features/operator/useAccessWatch.test.tsx features/operator/useVisits.test.tsx lib/supabase/auth-routes.test.ts",
+		"test:e2e": "playwright test"
 	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/ttt0mi/TGM-check-in.git"
+	},
+	"keywords": [
+		"visitor-management",
+		"guest-check-in",
+		"reception",
+		"workplace-security",
+		"qr-code",
+		"geofencing",
+		"nextjs",
+		"supabase",
+		"nigeria"
+	],
+	"author": "Tomi Omolokun",
+	"type": "module",
+	"bugs": {
+		"url": "https://github.com/ttt0mi/TGM-check-in/issues"
+	},
+	"homepage": "https://github.com/ttt0mi/TGM-check-in#readme",
 	"dependencies": {
+		"@hookform/resolvers": "^5.9.2",
 		"@marsidev/react-turnstile": "^1.6.2",
 		"@supabase/server": "^1.9.2",
 		"@supabase/ssr": "^0.12.7",
 		"@supabase/supabase-js": "^2.117.3",
-		"next": "^16.4.0",
+		"@tanstack/react-query": "^5.104.5",
+		"next": "^16.4.2",
 		"qrcode.react": "^4.2.0",
 		"react": "^19.1.0",
 		"react-dom": "^19.1.0",
-		"resend": "^6.33.0"
+		"react-hook-form": "^7.90.0",
+		"recharts": "^3.10.1",
+		"zod": "^3.25.76"
 	},
 	"devDependencies": {
-		"@eslint/js": "^10.0.1",
+		"@axe-core/playwright": "^4.14.0",
+		"@eslint/js": "^9.39.5",
+		"@playwright/test": "^1.64.1",
+		"@testing-library/jest-dom": "^7.0.1",
+		"@testing-library/react": "^16.3.3",
+		"@testing-library/user-event": "^14.6.8",
 		"@types/node": "^22.18.0",
 		"@types/react": "^19.1.12",
 		"@types/react-dom": "^19.1.9",
-		"eslint": "^10.12.0",
+		"@vitejs/plugin-react": "^6.1.2",
+		"axe-core": "^4.14.0",
+		"eslint": "^9.39.5",
+		"eslint-config-next": "^16.4.2",
+		"eslint-config-prettier": "^10.1.8",
 		"globals": "^17.13.0",
+		"jsdom": "^29.1.1",
+		"prettier": "^3.9.10",
 		"supabase": "^2.121.0",
 		"typescript": "^5.9.2",
-		"typescript-eslint": "^8.71.2"
+		"typescript-eslint": "^8.71.2",
+		"vitest": "^5.0.5"
 	}
 }

@@ -8,10 +8,12 @@ export default {
 		try {
 			if (req.method !== "GET")
 				return json({ error: "Method not allowed" }, 405);
+			const query = new URL(req.url).searchParams;
 			const slug = uuid(
-				new URL(req.url).searchParams.get("location"),
+				query.get("location"),
 				"location QR",
 			);
+			const selectedDepartment = query.has("department") ? uuid(query.get("department"), "department") : null;
 			const service = ctx.supabaseAdmin;
 			const { data: location, error: locationError } = await service
 				.from("locations")
@@ -23,41 +25,45 @@ export default {
 			if (!location) return json({ error: "Location unavailable" }, 404);
 			const { data: organization, error: organizationError } = await service
 				.from("organizations")
-				.select("id")
+				.select("id,name")
 				.eq("id", location.organization_id)
 				.eq("is_active", true)
 				.maybeSingle();
 			if (organizationError) throw organizationError;
 			if (!organization) return json({ error: "Location unavailable" }, 404);
 
-			const [departmentsResult, staffResult] = await Promise.all([
+			const [noticeResult, departmentsResult] = await Promise.all([
+				service.from("organization_privacy_notices")
+					.select("notice_copy,policy_url,approved_at")
+					.eq("organization_id", location.organization_id)
+					.maybeSingle(),
 				service
 					.from("departments")
 					.select("id,name")
 					.eq("organization_id", location.organization_id)
 					.eq("is_active", true)
 					.order("name"),
-				service
-					.from("staff")
+			]);
+			if (noticeResult.error) throw noticeResult.error;
+			if (!noticeResult.data) return json({ error: "Public check-in is not configured" }, 412);
+			if (departmentsResult.error) throw departmentsResult.error;
+			const departments = departmentsResult.data || [];
+			if (selectedDepartment && !departments.some(item => item.id === selectedDepartment))
+				return json({ error: "Department unavailable" }, 404);
+			const { data: staff, error: staffError } = selectedDepartment
+				? await service.from("staff")
 					.select("id,department_id,full_name,preferred_name")
 					.eq("location_id", location.id)
 					.eq("organization_id", location.organization_id)
+					.eq("department_id", selectedDepartment)
 					.eq("is_active", true)
-					.order("full_name"),
-			]);
-			if (departmentsResult.error) throw departmentsResult.error;
-			if (staffResult.error) throw staffResult.error;
-
-			const staff = staffResult.data || [];
-			const activeDepartmentIds = new Set(
-				staff.map(member => member.department_id),
-			);
-			const departments = (departmentsResult.data || [])
-				.filter(department => activeDepartmentIds.has(department.id))
-				.map(department => ({
+					.order("full_name")
+				: { data: [], error: null };
+			if (staffError) throw staffError;
+			const safeDepartments = departments.map(department => ({
 					id: department.id,
 					name: department.name,
-					staff: staff
+					staff: (staff || [])
 						.filter(member => member.department_id === department.id)
 						.map(member => ({
 							id: member.id,
@@ -66,12 +72,14 @@ export default {
 				}));
 
 			return json({
+				organization: { name: organization.name },
 				location: {
 					name: location.name,
 					address: location.address,
 					timezone: location.timezone,
 				},
-				departments,
+				departments: safeDepartments,
+				privacy_notice: noticeResult.data,
 			});
 		} catch (error) {
 			return failure(error);

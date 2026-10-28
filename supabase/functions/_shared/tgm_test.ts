@@ -1,4 +1,4 @@
-import { HttpError, readJson } from "./tgm.ts";
+import { failure, HttpError, readJson } from "./tgm.ts";
 
 Deno.test("readJson handles UTF-8 characters split across chunks", async () => {
 	const bytes = new TextEncoder().encode('{"name":"é"}');
@@ -28,5 +28,20 @@ Deno.test("readJson cancels an oversized request body", async () => {
 		throw new Error("Expected request to be rejected");
 	} catch (error) {
 		if (!(error instanceof HttpError) || error.status !== 413 || !cancelled) throw error;
+	}
+});
+
+Deno.test("unexpected Edge failures do not log or return sensitive error text", async () => {
+	const logged: unknown[] = [];
+	const original = console.error;
+	console.error = (...values: unknown[]) => logged.push(...values);
+	try {
+		const response = failure(new Error("visitor@example.com secret token"));
+		const body = await response.json();
+		if (response.status !== 500 || !/^[a-f0-9-]{36}$/.test(body.correlation_id)) throw new Error("Missing safe correlation ID");
+		if (JSON.stringify(body).includes("visitor@example.com") || JSON.stringify(logged).includes("visitor@example.com"))
+			throw new Error("Sensitive error text leaked");
+	} finally {
+		console.error = original;
 	}
 });

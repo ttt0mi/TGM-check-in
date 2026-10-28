@@ -1,0 +1,14 @@
+.next/
+.history/
+out/
+build/
+next-env.d.ts
+coverage/
+node_modules/
+playwright-report/
+package-lock.json
+supabase/functions/
+supabase/migrations/
+supabase/tests/
+.agents/
+skills-lock.json

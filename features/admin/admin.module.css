@@ -1,0 +1,147 @@
+.page {
+	overflow-wrap: anywhere;
+	max-width: 1100px;
+	margin: auto;
+	padding: 30px 20px 80px;
+	color: #17263a;
+}
+.page header a {
+	color: #1e3858;
+}
+.page h1 {
+	margin: 18px 0;
+}
+.page nav {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-bottom: 24px;
+}
+.page nav button {
+	padding: 8px 14px;
+	border: 1px solid #becbd9;
+	border-radius: 8px;
+	background: white;
+	text-transform: capitalize;
+	cursor: pointer;
+}
+.page nav button[aria-current="page"] {
+	background: #1e3858;
+	color: white;
+}
+.section {
+	margin-bottom: 28px;
+	padding: 24px;
+	border: 1px solid #e3e8ef;
+	border-radius: 12px;
+	background: white;
+}
+.section h2 {
+	margin: 0 0 16px;
+}
+.section h3 {
+	margin: 22px 0 10px;
+	font-size: 17px;
+}
+.form {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: end;
+	gap: 12px;
+	margin: 16px 0;
+}
+.form label {
+	display: grid;
+	gap: 5px;
+	min-width: 180px;
+	font-size: 13px;
+	font-weight: 650;
+}
+.form input,
+.form select {
+	min-height: 40px;
+	padding: 8px;
+	border: 1px solid #cbd5e0;
+	border-radius: 7px;
+}
+.section button {
+	min-height: 38px;
+	padding: 7px 12px;
+	border: 1px solid #1e3858;
+	border-radius: 7px;
+	background: #1e3858;
+	color: white;
+	cursor: pointer;
+}
+.section button:disabled {
+	opacity: 0.55;
+}
+.list {
+	display: grid;
+	gap: 12px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+.list li {
+	padding: 14px;
+	border: 1px solid #e3e8ef;
+	border-radius: 8px;
+}
+.list p {
+	margin: 6px 0;
+	color: #697585;
+	font-size: 13px;
+}
+.list button {
+	margin: 4px 7px 4px 0;
+}
+.error {
+	color: #b52c39;
+}
+.qr {
+	display: inline-grid;
+	gap: 8px;
+	margin: 12px 0;
+	padding: 16px;
+	border: 1px solid #dae1e8;
+	max-width: 100%;
+}
+.qrUrl {
+	max-width: 100%;
+	overflow-wrap: anywhere;
+}
+.qrControls {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 12px;
+}
+@media print {
+	@page {
+		size: A4 portrait;
+		margin: 18mm;
+	}
+	.page header,
+	.page nav,
+	.qrControls,
+	.form,
+	.section button,
+	.list li:not(.printTarget) {
+		display: none !important;
+	}
+	.section,
+	.page {
+		border: 0;
+		padding: 0;
+	}
+	.qr {
+		break-inside: avoid;
+		border: 0;
+		padding: 0;
+	}
+	.qr svg {
+		width: 70mm;
+		height: 70mm;
+	}
+}
