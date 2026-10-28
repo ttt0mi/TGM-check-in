@@ -18,7 +18,7 @@ export class RequestError extends Error {
 		public readonly correlationId?: string,
 		public readonly code?: string,
 	) {
-		super(message);
+		super(correlationId ? `${message} Reference: ${correlationId}.` : message);
 		this.name = "RequestError";
 	}
 }
@@ -29,6 +29,7 @@ function kindForStatus(status: number): RequestFailureKind {
 	if (status === 403) return "forbidden";
 	if (status === 404 || status === 410) return "missing";
 	if (status === 409) return "conflict";
+	if (status === 408) return "timeout";
 	if (status === 429) return "rate_limited";
 	if (status === 412 || status === 503 || status === 504) return "unavailable";
 	return "unexpected";
@@ -36,6 +37,13 @@ function kindForStatus(status: number): RequestFailureKind {
 
 function safeMessage(status: number, code: string | undefined): string {
 	const known: Record<string, string> = {
+		admin_required: "You need active administrator access for this action.",
+		organization_forbidden: "You cannot change another organization's records.",
+		notice_invalid: "Check the notice copy and HTTPS policy URL.",
+		active_visits: "Resolve this person's active visits before making this change.",
+		staff_dependencies: "Resolve this staff member's active assignments before making this change.",
+		resource_inactive: "This item is inactive. Refresh the list and choose an active item.",
+		provider_unknown: "The outcome is unclear. Check the record before trying again.",
 		invitation_invalid: "This invitation link is invalid or no longer available.",
 		invitation_expired: "This invitation has expired. Ask an administrator for a new one.",
 		invitation_used: "This invitation has already been accepted.",
@@ -49,6 +57,7 @@ function safeMessage(status: number, code: string | undefined): string {
 	if (status === 403) return "You do not have access to this action.";
 	if (status === 404 || status === 410) return "This item is no longer available.";
 	if (status === 409) return "This action conflicts with the current state. Refresh and try again.";
+	if (status === 408) return "This request took too long. Check its status before retrying.";
 	if (status >= 500) return "This service is temporarily unavailable. Please try again.";
 	return "Please check the details and try again.";
 }
@@ -83,9 +92,19 @@ export async function functionError(error: unknown, response?: Response): Promis
 }
 
 export function postgrestError(error: { code: string }): RequestError {
-	if (error.code === "42501")
+	if (error.code === "PGRST301" || error.code === "PGRST302")
+		return new RequestError(
+			"unauthorized",
+			401,
+			"Your session has expired. Sign in and try again.",
+			undefined,
+			error.code,
+		);
+	if (error.code === "22023" || error.code === "22P02")
+		return new RequestError("invalid", 400, "Check the details and try again.", undefined, error.code);
+	if (error.code === "42501" || error.code === "PT403")
 		return new RequestError("forbidden", 403, "You do not have access to this action.", undefined, error.code);
-	if (error.code === "23505")
+	if (error.code === "23505" || error.code === "PT409")
 		return new RequestError("conflict", 409, "A record with these details already exists.", undefined, error.code);
 	if (error.code === "23503" || error.code === "23514" || error.code === "P0001")
 		return new RequestError(
@@ -108,6 +127,8 @@ export function postgrestError(error: { code: string }): RequestError {
 }
 
 export function networkError(): RequestError {
+	if (typeof navigator !== "undefined" && navigator.onLine === false)
+		return new RequestError("unavailable", null, "You appear to be offline. Reconnect and try again.");
 	return new RequestError("unavailable", null, "Connection unavailable. Check your connection and try again.");
 }
 
