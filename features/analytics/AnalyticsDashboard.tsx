@@ -7,6 +7,7 @@ import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Too
 import { createClient } from "@/lib/supabase/browser";
 import { networkError, requestError, RequestError } from "@/lib/http/request-error";
 import { reportClientFailure } from "@/lib/observability/client";
+import { EXPORT_TIMEOUT_MS, withRequestTimeout } from "@/lib/http/timeout";
 import { reportLabel, reportSchema } from "./report-schema";
 import styles from "./analytics.module.css";
 
@@ -60,13 +61,19 @@ function Content({ role, branches }: { role: "admin" | "receptionist"; branches:
 		refetchOnWindowFocus: false,
 		retry: 1,
 		queryFn: async ({ signal }) => {
-			const timeout = AbortSignal.timeout(30000);
-			const { data, error, response } = await createClient().functions.invoke("get-visit-analytics", {
-				body,
-				signal: AbortSignal.any([signal, timeout]),
-			});
-			if (timeout.aborted) throw new RequestError("timeout", null, "Report request timed out. Please retry.");
-			if (error) throw response ? await requestError(response.clone()) : networkError();
+			const data = await withRequestTimeout(
+				async (requestSignal) => {
+					const result = await createClient().functions.invoke("get-visit-analytics", {
+						body,
+						signal: requestSignal,
+					});
+					if (result.error)
+						throw result.response ? await requestError(result.response.clone()) : networkError();
+					return result.data;
+				},
+				30_000,
+				signal,
+			);
 			const parsed = reportSchema.safeParse(data);
 			if (!parsed.success) {
 				reportClientFailure("operator", "network_failure");
@@ -91,14 +98,14 @@ function Content({ role, branches }: { role: "admin" | "receptionist"; branches:
 		setExportBusy(true);
 		setExportError("");
 		try {
-			const timeout = AbortSignal.timeout(120000);
-			const { data, error, response } = await createClient().functions.invoke("export-visit-report", {
-				body: { ...body, redacted },
-				signal: timeout,
-			});
-			if (timeout.aborted)
-				throw new RequestError("timeout", null, "Export timed out. Check report history before retrying.");
-			if (error) throw response ? await requestError(response.clone()) : networkError();
+			const { data, response } = await withRequestTimeout(async (signal) => {
+				const result = await createClient().functions.invoke("export-visit-report", {
+					body: { ...body, redacted },
+					signal,
+				});
+				if (result.error) throw result.response ? await requestError(result.response.clone()) : networkError();
+				return { data: result.data, response: result.response };
+			}, EXPORT_TIMEOUT_MS);
 			if (typeof data !== "string") throw new Error("Export response is incompatible. Please retry.");
 			const disposition = response?.headers.get("Content-Disposition") ?? "";
 			const serverFilename = disposition.match(/filename="([A-Za-z0-9._-]{1,120}\.csv)"/i)?.[1];
