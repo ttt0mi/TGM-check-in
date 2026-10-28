@@ -55,37 +55,46 @@ export function HostDecision() {
 
 	useEffect(() => {
 		let active = true;
-		let limited = false;
-		const fragment = new URLSearchParams(window.location.hash.slice(1));
-		const fromLink = fragment.get("token");
-		let value = fromLink ?? "";
-		if (!fromLink) {
-			try {
-				value = sessionStorage.getItem(storageKey) ?? "";
-			} catch {
-				limited = true;
+		const captureToken = () => {
+			let limited = false;
+			const fragment = new URLSearchParams(window.location.hash.slice(1));
+			const fromLink = fragment.get("token");
+			let value = fromLink ?? "";
+			if (!fromLink) {
+				try {
+					value = sessionStorage.getItem(storageKey) ?? "";
+				} catch {
+					limited = true;
+				}
 			}
-		}
-		if (!tokenPattern.test(value)) {
-			clearStoredToken();
-		} else {
-			if (fromLink) {
+			if (!tokenPattern.test(value)) {
+				clearStoredToken();
+			} else if (fromLink) {
 				try {
 					sessionStorage.setItem(storageKey, value);
 				} catch {
 					limited = true;
 				}
 			}
-		}
-		window.history.replaceState(null, "", window.location.pathname);
-		queueMicrotask(() => {
-			if (!active) return;
-			setStorageLimited(limited);
-			if (tokenPattern.test(value)) setToken(value);
-			else setPhase("invalid");
-		});
+			window.history.replaceState(null, "", window.location.pathname);
+			queueMicrotask(() => {
+				if (!active) return;
+				setStorageLimited(limited);
+				setConfirmation(null);
+				setPreview(null);
+				setMessage("");
+				if (tokenPattern.test(value)) setToken(value);
+				else {
+					setToken("");
+					setPhase("invalid");
+				}
+			});
+		};
+		captureToken();
+		window.addEventListener("hashchange", captureToken);
 		return () => {
 			active = false;
+			window.removeEventListener("hashchange", captureToken);
 		};
 	}, []);
 
@@ -135,7 +144,9 @@ export function HostDecision() {
 					setMessage("Decision outcome is uncertain. Checking the link status before another attempt.");
 				setRetryCounter((value) => value + 1);
 			} else {
-				setMessage(cause instanceof Error ? cause.message : "Unable to record your decision. Please retry.");
+				setMessage(
+					cause instanceof RequestError ? cause.message : "Unable to record your decision. Please retry.",
+				);
 			}
 		} finally {
 			setBusy(false);
