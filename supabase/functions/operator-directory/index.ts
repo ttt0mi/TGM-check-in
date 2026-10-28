@@ -1,18 +1,7 @@
 import { withSupabase } from "@supabase/server";
 import { authenticatedOperator, failure, HttpError, json, readJson } from "../_shared/tgm.ts";
 import type { Database } from "../_shared/database.ts";
-import type { SupabaseClient } from "@supabase/supabase-js";
-
-type PagedDatabase = Omit<Database, "public"> & {
-  public: Omit<Database["public"], "Functions"> & {
-    Functions: Database["public"]["Functions"] & {
-      tgm_list_organization_operators_page: {
-        Args: { p_actor_id: string; p_limit?: number; p_search?: string; p_after_email?: string; p_after_id?: string };
-        Returns: { user_id: string; email: string; role: Database["public"]["Enums"]["tgm_operator_role"]; is_active: boolean; location_id: string | null }[];
-      };
-    };
-  };
-};
+import { parseOperatorRows } from "../_shared/operator-page.ts";
 
 export default {
   fetch: withSupabase<Database>({ auth: "user" }, async (req, ctx) => {
@@ -30,9 +19,8 @@ export default {
       if (search.length > 120 || operatorSearch.length > 120 || Boolean(afterCreatedAt) !== Boolean(afterId)
 	    || Boolean(operatorAfterEmail) !== Boolean(operatorAfterId) || (afterId && operatorAfterId))
         throw new HttpError(400, "Invalid invitation page request");
-      const service = operator.service as unknown as SupabaseClient<PagedDatabase>;
       const [operators, invitations] = await Promise.all([
-        afterId ? Promise.resolve({ data: null, error: null }) : service.rpc("tgm_list_organization_operators_page", {
+        afterId ? Promise.resolve({ data: null, error: null }) : operator.service.rpc("tgm_list_organization_operators_page", {
           p_actor_id: operator.userId,
           p_limit: 26,
           p_search: operatorSearch || undefined,
@@ -52,7 +40,7 @@ export default {
       const invitationRows = invitations.data ?? [];
       const invitationPage = invitationRows.slice(0, 25);
       const lastInvitation = invitationPage.at(-1);
-      const operatorRows = operators.data ?? [];
+      const operatorRows = operators.data === null ? [] : parseOperatorRows(operators.data);
       const operatorPage = operatorRows.slice(0, 25);
       const lastOperator = operatorPage.at(-1);
       return json({

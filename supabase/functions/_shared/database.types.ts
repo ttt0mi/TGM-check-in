@@ -688,6 +688,15 @@ export type Database = {
         }
         Returns: undefined
       }
+      tgm_approve_privacy_notice_as_admin: {
+        Args: {
+          p_actor_id: string
+          p_notice_copy: string
+          p_organization_id: string
+          p_policy_url: string
+        }
+        Returns: undefined
+      }
       tgm_consume_public_rate_limit: {
         Args: {
           p_limit: number

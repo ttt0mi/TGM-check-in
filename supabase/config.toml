@@ -115,6 +115,12 @@ verify_jwt = true
 [functions.create-branch]
 verify_jwt = true
 
+[functions.approve-privacy-notice]
+verify_jwt = true
+
+[functions.move-staff-assignment]
+verify_jwt = true
+
 [functions.invite-operator]
 verify_jwt = true
 

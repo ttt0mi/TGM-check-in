@@ -39,8 +39,16 @@ begin
 end;
 $$;
 
-set local role authenticated;
-select set_config('request.jwt.claim.sub', 'fa000000-0000-4000-8000-000000000007', true);
+do $$
+begin
+  if has_function_privilege('anon', 'public.tgm_move_staff_assignment(uuid,uuid,uuid,uuid)', 'execute')
+    or has_function_privilege('authenticated', 'public.tgm_move_staff_assignment(uuid,uuid,uuid,uuid)', 'execute')
+    or not has_function_privilege('service_role', 'public.tgm_move_staff_assignment(uuid,uuid,uuid,uuid)', 'execute') then
+    raise exception 'Staff move RPC grants are unsafe';
+  end if;
+end;
+$$;
+set local role service_role;
 do $$
 declare blocked boolean := false;
 begin
@@ -55,11 +63,17 @@ end;
 $$;
 reset role;
 update public.visits set status = 'cancelled' where id = 'fa000000-0000-4000-8000-000000000008';
-set local role authenticated;
-select set_config('request.jwt.claim.sub', 'fa000000-0000-4000-8000-000000000007', true);
+set local role service_role;
 do $$
 declare moved public.staff;
+declare denied boolean := false;
 begin
+  begin
+    perform public.tgm_move_staff_assignment(
+      'fa000000-0000-4000-8000-000000000099', 'fa000000-0000-4000-8000-000000000006',
+      'fa000000-0000-4000-8000-000000000003', 'fa000000-0000-4000-8000-000000000005');
+  exception when insufficient_privilege then denied := true; end;
+  if not denied then raise exception 'Unverified actor moved staff'; end if;
   moved := public.tgm_move_staff_assignment(
     'fa000000-0000-4000-8000-000000000007', 'fa000000-0000-4000-8000-000000000006',
     'fa000000-0000-4000-8000-000000000003', 'fa000000-0000-4000-8000-000000000005');

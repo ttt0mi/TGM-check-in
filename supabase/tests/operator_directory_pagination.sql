@@ -33,10 +33,10 @@ select
 	'authenticated',
 	'authenticated',
 	case when n = 17 then 'special-operator@test.example'
-		else 'page-operator-' || lpad(n::text, 2, '0') || '@test.example' end,
+		else 'page-operator-' || lpad(n::text, 3, '0') || '@test.example' end,
 	now(),
 	'test'
-from generate_series(1, 30) as n;
+from generate_series(1, 105) as n;
 
 update public.operator_profiles
 set organization_id = 'ae000000-0000-4000-8000-000000000001', role = 'admin', is_active = true
@@ -73,6 +73,8 @@ declare
 	inactive_admin constant uuid := 'ae000000-0000-4000-8000-000000000104';
 	cursor_email text;
 	cursor_id uuid;
+	second_cursor_email text;
+	second_cursor_id uuid;
 	previous_email text;
 	previous_id uuid;
 	current_row record;
@@ -85,8 +87,8 @@ begin
 		raise exception 'Operator page execute grants are too broad or omit service_role';
 	end if;
 
-	if (select count(*) from public.tgm_list_organization_operators_page(admin_a, p_limit => 51)) <> 33 then
-		raise exception 'Admin did not receive every operator in their organization';
+	if (select count(*) from public.tgm_list_organization_operators_page(admin_a, p_limit => 51)) <> 51 then
+		raise exception 'Operator directory did not fill the maximum page';
 	end if;
 	if (select count(*) from public.tgm_list_organization_operators_page(admin_b, p_limit => 51)) <> 1 then
 		raise exception 'Operator directory crossed organization boundaries';
@@ -99,14 +101,16 @@ begin
 	end if;
 
 	if not exists (
-		select 1 from public.tgm_list_organization_operators_page(admin_a, p_limit => 51)
+		select 1 from public.tgm_list_organization_operators_page(
+			admin_a, p_limit => 51, p_search => 'special-receptionist')
 		where user_id = receptionist and role = 'receptionist'
 			and location_id = 'ae000000-0000-4000-8000-000000000010'
 	) then
 		raise exception 'Receptionist branch assignment is missing';
 	end if;
 	if not exists (
-		select 1 from public.tgm_list_organization_operators_page(admin_a, p_limit => 51)
+		select 1 from public.tgm_list_organization_operators_page(
+			admin_a, p_limit => 51, p_search => 'inactive-page-admin')
 		where user_id = inactive_admin and not is_active
 	) then
 		raise exception 'Inactive operator is missing from access management';
@@ -139,8 +143,8 @@ begin
 
 	if (select count(*) from public.tgm_list_organization_operators_page(admin_a, p_limit => 10)) <> 10
 		or (select count(*) from public.tgm_list_organization_operators_page(
-			admin_a, p_limit => 51, p_after_email => cursor_email, p_after_id => cursor_id)) <> 23 then
-		raise exception 'Operator keyset pagination lost records';
+			admin_a, p_limit => 51, p_after_email => cursor_email, p_after_id => cursor_id)) <> 51 then
+		raise exception 'Operator keyset pagination did not fill the second page';
 	end if;
 	if exists (
 		select first_page.user_id
@@ -151,6 +155,28 @@ begin
 			admin_a, p_limit => 51, p_after_email => cursor_email, p_after_id => cursor_id) next_page
 	) then
 		raise exception 'Operator keyset pages overlap';
+	end if;
+
+	select page.email, page.user_id into second_cursor_email, second_cursor_id
+	from public.tgm_list_organization_operators_page(
+		admin_a, p_limit => 51, p_after_email => cursor_email, p_after_id => cursor_id) page
+	order by lower(page.email), page.user_id
+	limit 1 offset 50;
+
+	if (select count(*) from public.tgm_list_organization_operators_page(
+		admin_a, p_limit => 51, p_after_email => second_cursor_email, p_after_id => second_cursor_id)) <> 47 then
+		raise exception 'Operator keyset pagination lost records beyond 100 operators';
+	end if;
+	if exists (
+		select second_page.user_id
+		from public.tgm_list_organization_operators_page(
+			admin_a, p_limit => 51, p_after_email => cursor_email, p_after_id => cursor_id) second_page
+		intersect
+		select third_page.user_id
+		from public.tgm_list_organization_operators_page(
+			admin_a, p_limit => 51, p_after_email => second_cursor_email, p_after_id => second_cursor_id) third_page
+	) then
+		raise exception 'Operator pages beyond 100 records overlap';
 	end if;
 
 	denied := false;
