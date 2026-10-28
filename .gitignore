@@ -44,3 +44,8 @@ next-env.d.ts
 # supabase
 tmp/
 supabase/.temp/
+
+# contributor's agent assistance
+.agents/
+skills-lock.json
+docs/*

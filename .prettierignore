@@ -10,3 +10,5 @@ package-lock.json
 supabase/functions/
 supabase/migrations/
 supabase/tests/
+.agents/
+skills-lock.json
