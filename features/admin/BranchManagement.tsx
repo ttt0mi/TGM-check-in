@@ -6,6 +6,9 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/browser";
+import { invokeFunction } from "@/lib/http/invoke-function";
+import { postgrestError, RequestError } from "@/lib/http/request-error";
+import { MUTATION_TIMEOUT_MS, READ_TIMEOUT_MS, withRequestTimeout } from "@/lib/http/timeout";
 import type { Branch } from "@/features/operator/types";
 import { messageRole } from "@/features/shared/message-role";
 import styles from "./admin.module.css";
@@ -40,16 +43,22 @@ export function BranchManagement({ branches, onChanged }: { branches: Branch[]; 
 	const [message, setMessage] = useState("");
 	async function create(values: Values) {
 		setMessage("");
-		const { error } = await createClient().functions.invoke("create-branch", {
-			body: values,
-		});
-		if (error) {
-			setMessage("Unable to create this branch. Check the details and retry.");
-			return;
+		try {
+			await invokeFunction("create-branch", values);
+			form.reset();
+			try {
+				onChanged();
+				setMessage("Branch created.");
+			} catch {
+				setMessage("Branch created, but records could not be refreshed. Refresh the page.");
+			}
+		} catch (cause) {
+			setMessage(
+				cause instanceof RequestError
+					? cause.message
+					: "Branch creation outcome is unclear. Refresh before retrying.",
+			);
 		}
-		form.reset();
-		onChanged();
-		setMessage("Branch created.");
 	}
 	return (
 		<section className={styles.section}>
@@ -159,38 +168,63 @@ function BranchEditor({ branch, onChanged }: { branch: Branch; onChanged: () => 
 			return;
 		}
 		setSaving(true);
-		const { error: failure } = await createClient()
-			.from("locations")
-			.update({
-				...parsed.data,
-				auto_close_enabled: autoClose,
-				auto_close_local_time: autoClose ? autoCloseTime : null,
-			})
-			.eq("id", branch.id);
-		setSaving(false);
-		if (failure) {
-			setError("Unable to save branch details. Check the values and retry.");
-			return;
+		try {
+			const { error: failure } = await withRequestTimeout(
+				async (signal) =>
+					await createClient()
+						.from("locations")
+						.update({
+							...parsed.data,
+							auto_close_enabled: autoClose,
+							auto_close_local_time: autoClose ? autoCloseTime : null,
+						})
+						.eq("id", branch.id)
+						.abortSignal(signal),
+				MUTATION_TIMEOUT_MS,
+			);
+			if (failure) throw postgrestError(failure);
+			setError("");
+			try {
+				onChanged();
+				setSavedMessage("Branch details saved.");
+			} catch {
+				setSavedMessage("Branch saved, but records could not be refreshed. Refresh the page.");
+			}
+		} catch (cause) {
+			setError(
+				cause instanceof RequestError ? cause.message : "Save outcome is unclear. Refresh before retrying.",
+			);
+		} finally {
+			setSaving(false);
 		}
-		setError("");
-		setSavedMessage("Branch details saved.");
-		onChanged();
 	}
 	async function setActive(active: boolean) {
 		const supabase = createClient();
 		if (!active) {
-			const { count, error: preflightError } = await supabase
-				.from("visits")
-				.select("id", { count: "exact", head: true })
-				.eq("location_id", branch.id)
-				.in("status", [
-					"pending_reception_review",
-					"pending_host_acknowledgement",
-					"host_approved_awaiting_reception",
-					"approved_on_site",
-				]);
+			let preflight;
+			try {
+				preflight = await withRequestTimeout(
+					async (signal) =>
+						await supabase
+							.from("visits")
+							.select("id", { count: "exact", head: true })
+							.eq("location_id", branch.id)
+							.in("status", [
+								"pending_reception_review",
+								"pending_host_acknowledgement",
+								"host_approved_awaiting_reception",
+								"approved_on_site",
+							])
+							.abortSignal(signal),
+					READ_TIMEOUT_MS,
+				);
+			} catch (cause) {
+				setError(cause instanceof RequestError ? cause.message : "Unable to check active visits.");
+				return;
+			}
+			const { count, error: preflightError } = preflight;
 			if (preflightError) {
-				setError("Unable to check active visits. Please retry.");
+				setError(postgrestError(preflightError).message);
 				return;
 			}
 			if (count) {
@@ -205,18 +239,32 @@ function BranchEditor({ branch, onChanged }: { branch: Branch; onChanged: () => 
 		)
 			return;
 		setActivePending(true);
-		const { error: failure } = await createClient()
-			.from("locations")
-			.update({ is_active: active })
-			.eq("id", branch.id);
-		if (failure) {
-			setError("Unable to change branch availability. Check for active visits and retry.");
+		try {
+			const { error: failure } = await withRequestTimeout(
+				async (signal) =>
+					await createClient()
+						.from("locations")
+						.update({ is_active: active })
+						.eq("id", branch.id)
+						.abortSignal(signal),
+				MUTATION_TIMEOUT_MS,
+			);
+			if (failure) throw postgrestError(failure);
+			setError("");
+			try {
+				onChanged();
+			} catch {
+				setError("Availability changed, but records could not be refreshed. Refresh the page.");
+			}
+		} catch (cause) {
+			setError(
+				cause instanceof RequestError
+					? cause.message
+					: "Availability outcome is unclear. Refresh before retrying.",
+			);
+		} finally {
 			setActivePending(false);
-			return;
 		}
-		setError("");
-		setActivePending(false);
-		onChanged();
 	}
 	return (
 		<>
@@ -298,7 +346,7 @@ function BranchEditor({ branch, onChanged }: { branch: Branch; onChanged: () => 
 					{error}
 				</p>
 			)}
-			{savedMessage && <p role="status">{savedMessage}</p>}
+			{savedMessage && <p role={messageRole(savedMessage)}>{savedMessage}</p>}
 		</>
 	);
 }

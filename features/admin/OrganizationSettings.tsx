@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/browser";
+import { invokeFunction } from "@/lib/http/invoke-function";
+import { postgrestError, RequestError } from "@/lib/http/request-error";
+import { MUTATION_TIMEOUT_MS, withRequestTimeout } from "@/lib/http/timeout";
 import { messageRole } from "@/features/shared/message-role";
 import styles from "./admin.module.css";
 
@@ -28,33 +31,55 @@ export function OrganizationSettings({
 			return;
 		}
 		setSavingName(true);
-		const { error } = await createClient()
-			.from("organizations")
-			.update({ name: name.trim() })
-			.eq("id", organization.id);
-		setSavingName(false);
-		setMessage(error ? "Unable to save the organization name. Please retry." : "Organization name saved.");
-		if (!error) onChanged();
+		try {
+			const { error } = await withRequestTimeout(
+				async (signal) =>
+					await createClient()
+						.from("organizations")
+						.update({ name: name.trim() })
+						.eq("id", organization.id)
+						.abortSignal(signal),
+				MUTATION_TIMEOUT_MS,
+			);
+			if (error) throw postgrestError(error);
+			try {
+				onChanged();
+				setMessage("Organization name saved.");
+			} catch {
+				setMessage("Name saved, but records could not be refreshed. Refresh the page before editing again.");
+			}
+		} catch (cause) {
+			setMessage(
+				cause instanceof RequestError ? cause.message : "The save outcome is unclear. Refresh before retrying.",
+			);
+		} finally {
+			setSavingName(false);
+		}
 	}
 	async function saveNotice(event: React.FormEvent) {
 		event.preventDefault();
 		if (!approved) return;
 		setSavingNotice(true);
-		const { error } = await createClient().rpc("tgm_approve_privacy_notice", {
-			p_organization_id: organization.id,
-			p_notice_copy: noticeCopy.trim(),
-			p_policy_url: policyUrl.trim(),
-		});
-		setMessage(
-			error
-				? "The privacy notice could not be approved. Check the copy and URL, then retry."
-				: "Privacy notice approved for public check-in.",
-		);
-		if (!error) {
+		try {
+			await invokeFunction("approve-privacy-notice", {
+				organization_id: organization.id,
+				notice_copy: noticeCopy.trim(),
+				policy_url: policyUrl.trim(),
+			});
 			setApproved(false);
-			onChanged();
+			try {
+				onChanged();
+				setMessage("Privacy notice approved for public check-in.");
+			} catch {
+				setMessage("Notice approved, but records could not be refreshed. Refresh the page to confirm it.");
+			}
+		} catch (cause) {
+			setMessage(
+				cause instanceof RequestError ? cause.message : "Approval outcome is unclear. Refresh before retrying.",
+			);
+		} finally {
+			setSavingNotice(false);
 		}
-		setSavingNotice(false);
 	}
 	return (
 		<section className={styles.section}>

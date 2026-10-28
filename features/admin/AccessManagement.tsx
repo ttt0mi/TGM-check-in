@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { createClient } from "@/lib/supabase/browser";
+import { invokeFunction } from "@/lib/http/invoke-function";
+import { RequestError } from "@/lib/http/request-error";
+import { READ_TIMEOUT_MS } from "@/lib/http/timeout";
 import type { Branch } from "@/features/operator/types";
 import { messageRole } from "@/features/shared/message-role";
 import styles from "./admin.module.css";
@@ -29,6 +31,14 @@ type Invitation = {
 };
 type InvitationCursor = { created_at: string; id: string };
 type OperatorCursor = { email: string; id: string };
+type DirectoryResponse = {
+	operators: Operator[] | null;
+	operator_next_cursor: OperatorCursor | null;
+	invitations: Invitation[] | null;
+	next_cursor: InvitationCursor | null;
+};
+const errorMessage = (cause: unknown) =>
+	cause instanceof RequestError ? cause.message : "The outcome is unclear. Refresh before retrying.";
 
 function invitationState(item: Invitation, asOf: number) {
 	if (item.accepted_at) return "Accepted";
@@ -64,15 +74,16 @@ export function AccessManagement({ branches }: { branches: Branch[] }) {
 
 	const refresh = useCallback(async () => {
 		const currentRequest = ++requestId.current;
-		const { data, error } = await createClient().functions.invoke("operator-directory", {
-			body: { search, operator_search: operatorSearch },
-		});
-		if (error) throw error;
+		const data = await invokeFunction<DirectoryResponse>(
+			"operator-directory",
+			{ search, operator_search: operatorSearch },
+			READ_TIMEOUT_MS,
+		);
 		if (currentRequest !== requestId.current) return;
-		setOperators(data.operators as Operator[]);
-		setOperatorNextCursor(data.operator_next_cursor as OperatorCursor | null);
-		setInvitations(data.invitations as Invitation[]);
-		setNextCursor(data.next_cursor as InvitationCursor | null);
+		setOperators(data.operators ?? []);
+		setOperatorNextCursor(data.operator_next_cursor);
+		setInvitations(data.invitations ?? []);
+		setNextCursor(data.next_cursor);
 		setAsOf(Date.now());
 		setLoading(false);
 	}, [search, operatorSearch]);
@@ -80,38 +91,44 @@ export function AccessManagement({ branches }: { branches: Branch[] }) {
 		if (!operatorNextCursor) return;
 		const currentRequest = requestId.current;
 		setBusy("more-operators", true);
-		const { data, error } = await createClient().functions.invoke("operator-directory", {
-			body: {
-				operator_search: operatorSearch,
-				operator_after_email: operatorNextCursor.email,
-				operator_after_id: operatorNextCursor.id,
-			},
-		});
-		setBusy("more-operators", false);
-		if (error) {
-			setMessage("Unable to load more operators. Please retry.");
-			return;
+		try {
+			const data = await invokeFunction<DirectoryResponse>(
+				"operator-directory",
+				{
+					operator_search: operatorSearch,
+					operator_after_email: operatorNextCursor.email,
+					operator_after_id: operatorNextCursor.id,
+				},
+				READ_TIMEOUT_MS,
+			);
+			if (currentRequest !== requestId.current) return;
+			setOperators((current) => [...current, ...(data.operators ?? [])]);
+			setOperatorNextCursor(data.operator_next_cursor);
+		} catch (cause) {
+			setMessage(errorMessage(cause));
+		} finally {
+			setBusy("more-operators", false);
 		}
-		if (currentRequest !== requestId.current) return;
-		setOperators((current) => [...current, ...(data.operators as Operator[])]);
-		setOperatorNextCursor(data.operator_next_cursor as OperatorCursor | null);
 	}
 	async function loadMore() {
 		if (!nextCursor) return;
 		const currentRequest = requestId.current;
 		setBusy("more", true);
-		const { data, error } = await createClient().functions.invoke("operator-directory", {
-			body: { search, after_created_at: nextCursor.created_at, after_id: nextCursor.id },
-		});
-		setBusy("more", false);
-		if (error) {
-			setMessage("Unable to load more invitation history. Please retry.");
-			return;
+		try {
+			const data = await invokeFunction<DirectoryResponse>(
+				"operator-directory",
+				{ search, after_created_at: nextCursor.created_at, after_id: nextCursor.id },
+				READ_TIMEOUT_MS,
+			);
+			if (currentRequest !== requestId.current) return;
+			setInvitations((current) => [...current, ...(data.invitations ?? [])]);
+			setNextCursor(data.next_cursor);
+			setAsOf(Date.now());
+		} catch (cause) {
+			setMessage(errorMessage(cause));
+		} finally {
+			setBusy("more", false);
 		}
-		if (currentRequest !== requestId.current) return;
-		setInvitations((current) => [...current, ...(data.invitations as Invitation[])]);
-		setNextCursor(data.next_cursor as InvitationCursor | null);
-		setAsOf(Date.now());
 	}
 
 	useEffect(() => {
@@ -127,19 +144,24 @@ export function AccessManagement({ branches }: { branches: Branch[] }) {
 		event.preventDefault();
 		setBusy("invite", true);
 		setMessage("");
-		const { error } = await createClient().functions.invoke("invite-operator", {
-			body: {
+		let failure: string | null = null;
+		try {
+			await invokeFunction("invite-operator", {
 				email: email.trim(),
 				role,
 				location_id: role === "receptionist" ? branchId : null,
-			},
-		});
-		setBusy("invite", false);
-		setMessage(error ? "Unable to send invitation. Check the details and retry." : "Invitation request recorded.");
-		if (!error) setEmail("");
+			});
+			setEmail("");
+			setMessage("Invitation request recorded.");
+		} catch (cause) {
+			failure = errorMessage(cause);
+			setMessage(failure);
+		} finally {
+			setBusy("invite", false);
+		}
 		await refresh().catch(() =>
 			setMessage(
-				error
+				failure
 					? "Invitation result is unclear and records could not be refreshed. Please retry refresh."
 					: "Invitation recorded, but records could not be refreshed. Please retry refresh.",
 			),
@@ -161,20 +183,19 @@ export function AccessManagement({ branches }: { branches: Branch[] }) {
 			return;
 		setBusy(item.id, true);
 		setMessage("");
-		const { error } = await createClient().functions.invoke("manage-operator-invitation", {
-			body: { invitation_id: item.id, action },
-		});
-		setBusy(item.id, false);
-		setMessage(
-			error
-				? "Unable to update invitation. Please retry."
-				: action === "revoke"
-					? "Invitation revoked."
-					: "Invitation resend requested.",
-		);
+		let failure: string | null = null;
+		try {
+			await invokeFunction("manage-operator-invitation", { invitation_id: item.id, action });
+			setMessage(action === "revoke" ? "Invitation revoked." : "Invitation resend requested.");
+		} catch (cause) {
+			failure = errorMessage(cause);
+			setMessage(failure);
+		} finally {
+			setBusy(item.id, false);
+		}
 		await refresh().catch(() =>
 			setMessage(
-				error
+				failure
 					? "Invitation result is unclear and records could not be refreshed."
 					: "Invitation updated, but records could not be refreshed. Please retry refresh.",
 			),
@@ -189,8 +210,9 @@ export function AccessManagement({ branches }: { branches: Branch[] }) {
 		if (action === "deactivate" && !window.confirm(`Deactivate ${operator.email}? Their access will end.`)) return;
 		setBusy(operator.user_id, true);
 		setMessage("");
-		const { error } = await createClient().functions.invoke("manage-operator", {
-			body: {
+		let failure: string | null = null;
+		try {
+			await invokeFunction("manage-operator", {
 				user_id: operator.user_id,
 				action,
 				...(action === "assign"
@@ -199,13 +221,17 @@ export function AccessManagement({ branches }: { branches: Branch[] }) {
 							location_id: newRole === "receptionist" ? newBranchId : null,
 						}
 					: {}),
-			},
-		});
-		setBusy(operator.user_id, false);
-		setMessage(error ? "Unable to update operator access. Please retry." : "Operator updated.");
+			});
+			setMessage("Operator updated.");
+		} catch (cause) {
+			failure = errorMessage(cause);
+			setMessage(failure);
+		} finally {
+			setBusy(operator.user_id, false);
+		}
 		await refresh().catch(() =>
 			setMessage(
-				error
+				failure
 					? "Operator result is unclear and records could not be refreshed."
 					: "Operator updated, but records could not be refreshed. Please retry refresh.",
 			),

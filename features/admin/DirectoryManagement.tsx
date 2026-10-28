@@ -8,6 +8,9 @@ import type { Branch, Department, Staff } from "@/features/operator/types";
 import { messageRole } from "@/features/shared/message-role";
 import styles from "./admin.module.css";
 import { visitStatusLabel } from "@/features/shared/visit-labels";
+import { invokeFunction } from "@/lib/http/invoke-function";
+import { postgrestError, RequestError } from "@/lib/http/request-error";
+import { MUTATION_TIMEOUT_MS, READ_TIMEOUT_MS, withRequestTimeout } from "@/lib/http/timeout";
 
 const staffDetailsSchema = z.object({
 	full_name: z.string().trim().min(1).max(120),
@@ -66,7 +69,17 @@ export function DirectoryManagement({
 		if (staffStatus !== "all") query = query.eq("is_active", staffStatus === "active");
 		if (staffSearch)
 			query = query.ilike("full_name", `%${staffSearch.replaceAll("%", "\\%").replaceAll("_", "\\_")}%`);
-		const { data, count, error } = await query;
+		let result;
+		try {
+			result = await withRequestTimeout(async (signal) => await query.abortSignal(signal), READ_TIMEOUT_MS);
+		} catch (cause) {
+			if (requestId === staffRequest.current) {
+				setStaffLoading(false);
+				setMessage(cause instanceof RequestError ? cause.message : "Unable to refresh staff. Please retry.");
+			}
+			return;
+		}
+		const { data, count, error } = result;
 		if (requestId !== staffRequest.current) return;
 		setStaffLoading(false);
 		if (error) {
@@ -93,15 +106,30 @@ export function DirectoryManagement({
 			return;
 		}
 		setAddingDepartment(true);
-		const { error } = await createClient().from("departments").insert({ organization_id: organizationId, name });
-		setAddingDepartment(false);
-		if (error) {
-			setMessage("Unable to add department. Check whether the name already exists and retry.");
-			return;
+		try {
+			const { error } = await withRequestTimeout(
+				async (signal) =>
+					await createClient()
+						.from("departments")
+						.insert({ organization_id: organizationId, name })
+						.abortSignal(signal),
+				MUTATION_TIMEOUT_MS,
+			);
+			if (error) throw postgrestError(error);
+			setDepartmentName("");
+			try {
+				changed();
+				setMessage("Department added.");
+			} catch {
+				setMessage("Department added, but records could not be refreshed. Refresh the directory.");
+			}
+		} catch (cause) {
+			setMessage(
+				cause instanceof RequestError ? cause.message : "Add outcome is unclear. Refresh before retrying.",
+			);
+		} finally {
+			setAddingDepartment(false);
 		}
-		setDepartmentName("");
-		setMessage("Department added.");
-		changed();
 	}
 	async function addStaff(event: React.FormEvent) {
 		event.preventDefault();
@@ -119,26 +147,39 @@ export function DirectoryManagement({
 			return;
 		}
 		setAddingStaff(true);
-		const { error } = await createClient()
-			.from("staff")
-			.insert({
-				organization_id: organizationId,
-				location_id: branchId,
-				department_id: departmentId,
-				full_name: details.data.full_name,
-				preferred_name: details.data.preferred_name || null,
-				email: details.data.email,
-			});
-		setAddingStaff(false);
-		if (error) {
-			setMessage("Unable to add staff. Check for an existing active email address and retry.");
-			return;
+		try {
+			const { error } = await withRequestTimeout(
+				async (signal) =>
+					await createClient()
+						.from("staff")
+						.insert({
+							organization_id: organizationId,
+							location_id: branchId,
+							department_id: departmentId,
+							full_name: details.data.full_name,
+							preferred_name: details.data.preferred_name || null,
+							email: details.data.email,
+						})
+						.abortSignal(signal),
+				MUTATION_TIMEOUT_MS,
+			);
+			if (error) throw postgrestError(error);
+			setFullName("");
+			setPreferredName("");
+			setEmail("");
+			try {
+				changed("staff");
+				setMessage("Staff member added.");
+			} catch {
+				setMessage("Staff member added, but records could not be refreshed. Refresh the directory.");
+			}
+		} catch (cause) {
+			setMessage(
+				cause instanceof RequestError ? cause.message : "Add outcome is unclear. Refresh before retrying.",
+			);
+		} finally {
+			setAddingStaff(false);
 		}
-		setFullName("");
-		setPreferredName("");
-		setEmail("");
-		setMessage("Staff member added.");
-		changed("staff");
 	}
 	async function toggle(table: "departments" | "staff", id: string, isActive: boolean) {
 		const supabase = createClient();
@@ -149,42 +190,63 @@ export function DirectoryManagement({
 				? departments.find((item) => item.id === id)?.name
 				: staffRows.find((item) => item.id === id)?.full_name;
 		if (isActive) {
-			const result =
-				table === "departments"
-					? await supabase
-							.from("staff")
-							.select("id", { count: "exact", head: true })
-							.eq("department_id", id)
-							.eq("is_active", true)
-					: await supabase
-							.from("visits")
-							.select("id", { count: "exact", head: true })
-							.eq("staff_id", id)
-							.in("status", [
-								"pending_reception_review",
-								"pending_host_acknowledgement",
-								"host_approved_awaiting_reception",
-								"approved_on_site",
-							]);
+			let result;
+			try {
+				result = await withRequestTimeout(
+					async (signal) =>
+						table === "departments"
+							? await supabase
+									.from("staff")
+									.select("id", { count: "exact", head: true })
+									.eq("department_id", id)
+									.eq("is_active", true)
+									.abortSignal(signal)
+							: await supabase
+									.from("visits")
+									.select("id", { count: "exact", head: true })
+									.eq("staff_id", id)
+									.in("status", [
+										"pending_reception_review",
+										"pending_host_acknowledgement",
+										"host_approved_awaiting_reception",
+										"approved_on_site",
+									])
+									.abortSignal(signal),
+					READ_TIMEOUT_MS,
+				);
+			} catch (cause) {
+				setMessage(cause instanceof RequestError ? cause.message : "Unable to check dependencies.");
+				return;
+			}
 			if (result.error) {
-				setMessage("Unable to check dependencies. Please retry.");
+				setMessage(postgrestError(result.error).message);
 				return;
 			}
 			if (result.count) {
 				if (table === "staff") {
-					const visits = await supabase
-						.from("visits")
-						.select("id,visitor_full_name,status")
-						.eq("staff_id", id)
-						.in("status", [
-							"pending_reception_review",
-							"pending_host_acknowledgement",
-							"host_approved_awaiting_reception",
-							"approved_on_site",
-						])
-						.order("arrived_at", { ascending: true })
-						.limit(10);
-					if (visits.data) setBlockingVisits(visits.data);
+					let visits;
+					try {
+						visits = await withRequestTimeout(
+							async (signal) =>
+								await supabase
+									.from("visits")
+									.select("id,visitor_full_name,status")
+									.eq("staff_id", id)
+									.in("status", [
+										"pending_reception_review",
+										"pending_host_acknowledgement",
+										"host_approved_awaiting_reception",
+										"approved_on_site",
+									])
+									.order("arrived_at", { ascending: true })
+									.limit(10)
+									.abortSignal(signal),
+							READ_TIMEOUT_MS,
+						);
+					} catch {
+						visits = null;
+					}
+					if (visits?.data) setBlockingVisits(visits.data);
 					setBlockingBranchId(staffRows.find((item) => item.id === id)?.location_id ?? null);
 				}
 				setMessage(
@@ -203,25 +265,40 @@ export function DirectoryManagement({
 			return;
 		setBusyId(id);
 		setMessage("");
-		const { error } =
-			table === "departments"
-				? await supabase
-						.from("departments")
-						.update({ is_active: !isActive })
-						.eq("id", id)
-						.eq("organization_id", organizationId)
-				: await supabase
-						.from("staff")
-						.update({ is_active: !isActive })
-						.eq("id", id)
-						.eq("organization_id", organizationId);
-		if (error) {
-			setMessage("Unable to change availability. Check for active dependencies and retry.");
+		try {
+			const { error } = await withRequestTimeout(
+				async (signal) =>
+					table === "departments"
+						? await supabase
+								.from("departments")
+								.update({ is_active: !isActive })
+								.eq("id", id)
+								.eq("organization_id", organizationId)
+								.abortSignal(signal)
+						: await supabase
+								.from("staff")
+								.update({ is_active: !isActive })
+								.eq("id", id)
+								.eq("organization_id", organizationId)
+								.abortSignal(signal),
+				MUTATION_TIMEOUT_MS,
+			);
+			if (error) throw postgrestError(error);
+			try {
+				changed(table === "staff" ? "staff" : "all");
+				setMessage("Availability updated.");
+			} catch {
+				setMessage("Availability changed, but records could not be refreshed. Refresh the directory.");
+			}
+		} catch (cause) {
+			setMessage(
+				cause instanceof RequestError
+					? cause.message
+					: "Availability outcome is unclear. Refresh before retrying.",
+			);
+		} finally {
 			setBusyId(null);
-			return;
 		}
-		setBusyId(null);
-		changed(table === "staff" ? "staff" : "all");
 	}
 	async function renameDepartment(event: React.FormEvent, item: Department) {
 		event.preventDefault();
@@ -235,19 +312,32 @@ export function DirectoryManagement({
 			return;
 		}
 		setBusyId(item.id);
-		const { error } = await createClient()
-			.from("departments")
-			.update({ name })
-			.eq("id", item.id)
-			.eq("organization_id", organizationId);
-		if (error) {
-			setMessage("Unable to rename this department. Please retry.");
+		try {
+			const { error } = await withRequestTimeout(
+				async (signal) =>
+					await createClient()
+						.from("departments")
+						.update({ name })
+						.eq("id", item.id)
+						.eq("organization_id", organizationId)
+						.abortSignal(signal),
+				MUTATION_TIMEOUT_MS,
+			);
+			if (error) throw postgrestError(error);
+			setRenamingDepartmentId(null);
+			try {
+				changed();
+				setMessage("Department renamed.");
+			} catch {
+				setMessage("Department renamed, but records could not be refreshed. Refresh the directory.");
+			}
+		} catch (cause) {
+			setMessage(
+				cause instanceof RequestError ? cause.message : "Rename outcome is unclear. Refresh before retrying.",
+			);
+		} finally {
 			setBusyId(null);
-			return;
 		}
-		setBusyId(null);
-		setRenamingDepartmentId(null);
-		changed();
 	}
 	return (
 		<section className={styles.section}>
@@ -505,18 +595,29 @@ function StaffEditor({
 				onError("Save name and email changes first, then move this host.");
 				return;
 			}
-			const preflight = await supabase
-				.from("visits")
-				.select("id", { count: "exact", head: true })
-				.eq("staff_id", item.id)
-				.in("status", [
-					"pending_reception_review",
-					"pending_host_acknowledgement",
-					"host_approved_awaiting_reception",
-					"approved_on_site",
-				]);
+			let preflight;
+			try {
+				preflight = await withRequestTimeout(
+					async (signal) =>
+						await supabase
+							.from("visits")
+							.select("id", { count: "exact", head: true })
+							.eq("staff_id", item.id)
+							.in("status", [
+								"pending_reception_review",
+								"pending_host_acknowledgement",
+								"host_approved_awaiting_reception",
+								"approved_on_site",
+							])
+							.abortSignal(signal),
+					READ_TIMEOUT_MS,
+				);
+			} catch (cause) {
+				onError(cause instanceof RequestError ? cause.message : "Unable to check active visits.");
+				return;
+			}
 			if (preflight.error) {
-				onError("Unable to check active visits. Please retry.");
+				onError(postgrestError(preflight.error).message);
 				return;
 			}
 			if (preflight.count) {
@@ -529,47 +630,61 @@ function StaffEditor({
 				)
 			)
 				return;
-			const {
-				data: { user },
-				error: authError,
-			} = await supabase.auth.getUser();
-			if (authError || !user) {
-				onError("Your session needs to be refreshed before moving staff.");
-				return;
-			}
 			setBusy(true);
-			const { error } = await supabase.rpc("tgm_move_staff_assignment", {
-				p_actor_id: user.id,
-				p_staff_id: item.id,
-				p_location_id: branchId,
-				p_department_id: departmentId,
-			});
-			setBusy(false);
-			if (error) {
-				onError("Unable to move this host. Resolve any active visits and retry.");
+			try {
+				await invokeFunction("move-staff-assignment", {
+					staff_id: item.id,
+					location_id: branchId,
+					department_id: departmentId,
+				});
+			} catch (cause) {
+				onError(
+					cause instanceof RequestError
+						? cause.message
+						: "Move outcome is unclear. Refresh the directory before retrying.",
+				);
 				return;
+			} finally {
+				setBusy(false);
 			}
 			setOpen(false);
-			onChanged();
+			try {
+				onChanged();
+			} catch {
+				onError("Host moved, but records could not be refreshed. Refresh the directory.");
+			}
 			return;
 		}
 		setBusy(true);
-		const { error } = await supabase
-			.from("staff")
-			.update({
-				full_name: details.data.full_name,
-				preferred_name: details.data.preferred_name || null,
-				email: details.data.email,
-			})
-			.eq("id", item.id)
-			.eq("organization_id", organizationId);
-		setBusy(false);
-		if (error) {
-			onError("Unable to save this host. Check the details and retry.");
-			return;
+		try {
+			const { error } = await withRequestTimeout(
+				async (signal) =>
+					await supabase
+						.from("staff")
+						.update({
+							full_name: details.data.full_name,
+							preferred_name: details.data.preferred_name || null,
+							email: details.data.email,
+						})
+						.eq("id", item.id)
+						.eq("organization_id", organizationId)
+						.abortSignal(signal),
+				MUTATION_TIMEOUT_MS,
+			);
+			if (error) throw postgrestError(error);
+			setOpen(false);
+			try {
+				onChanged();
+			} catch {
+				onError("Host saved, but records could not be refreshed. Refresh the directory.");
+			}
+		} catch (cause) {
+			onError(
+				cause instanceof RequestError ? cause.message : "Save outcome is unclear. Refresh before retrying.",
+			);
+		} finally {
+			setBusy(false);
 		}
-		setOpen(false);
-		onChanged();
 	}
 	return (
 		<>
