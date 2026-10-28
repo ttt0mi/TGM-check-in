@@ -14,6 +14,7 @@
 		"typecheck": "tsc -p tsconfig.build.json --noEmit",
 		"typecheck:test": "tsc -p tsconfig.test.json --noEmit",
 		"test:unit": "vitest run",
+		"test:release-coverage": "vitest run features/admin/AccessManagement.test.tsx features/admin/AdminAccessibility.test.tsx features/admin/BranchManagement.test.tsx features/admin/DirectoryManagement.test.tsx features/admin/OrganizationSettings.test.tsx features/admin/PrintableQr.test.tsx features/analytics/AnalyticsDashboard.test.tsx features/auth/AcceptInvite.test.tsx features/auth/AuthForm.test.tsx features/auth/SignOut.test.tsx features/operator/useAccessWatch.test.tsx features/operator/useVisits.test.tsx lib/supabase/auth-routes.test.ts",
 		"test:e2e": "playwright test"
 	},
 	"repository": {

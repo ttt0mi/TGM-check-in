@@ -2,6 +2,8 @@ import { createServer } from "node:http";
 
 const port = Number(process.env.TGM_MOCK_SUPABASE_PORT ?? 54331);
 const branchId = "11111111-1111-4111-8111-111111111111";
+const unapprovedBranchId = "44444444-4444-4444-8444-444444444444";
+const outageBranchId = "55555555-5555-4555-8555-555555555555";
 const departmentId = "22222222-2222-4222-8222-222222222222";
 const hostId = "33333333-3333-4333-8333-333333333333";
 let visit = null;
@@ -40,6 +42,10 @@ createServer(async (request, response) => {
 		return reply(response, 200, { state: hostState });
 	}
 	if (url.pathname === "/functions/v1/get-public-directory") {
+		if (url.searchParams.get("location") === unapprovedBranchId)
+			return reply(response, 412, { code: "privacy_notice_required" });
+		if (url.searchParams.get("location") === outageBranchId)
+			return reply(response, 503, { error: "Directory temporarily unavailable" });
 		if (url.searchParams.get("location") !== branchId) return reply(response, 404, { error: "Unknown branch" });
 		return reply(response, 200, {
 			organization: { name: "Example Organization" },

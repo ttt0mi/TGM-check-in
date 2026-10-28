@@ -52,6 +52,9 @@ jobs:
             - name: Run unit tests
               run: npm run test:unit
 
+            - name: Run release behavior coverage
+              run: npm run test:release-coverage
+
             - name: Build enabled frontend routes
               env:
                   NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
@@ -104,9 +107,9 @@ jobs:
               working-directory: supabase/functions
               run: rg --files -g index.ts . | sort | xargs deno check
 
-            - name: Run Edge Function tests
+            - name: Run Edge Function unit and authenticated handler tests
               working-directory: supabase/functions
-              run: rg --files -g '*_test.ts' . | sort | xargs deno test
+              run: rg --files -g '*_test.ts' . | sort | xargs deno test --allow-env
 
             - name: Run database regressions
               run: |

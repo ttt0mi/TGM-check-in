@@ -187,6 +187,27 @@ test("home routes into the new account flow", async ({ page }) => {
 	await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
 });
 
+test("invalid QR and unknown branch show distinct public exits", async ({ page }) => {
+	await page.goto("/check-in/not-a-branch-code");
+	await expect(page.getByRole("heading", { name: "Invalid check-in code" })).toBeVisible();
+	await page.goto(`/check-in/${"f".repeat(8)}-${"f".repeat(4)}-4fff-8fff-${"f".repeat(12)}`);
+	await expect(page.getByRole("heading", { name: "Check-in code unavailable" })).toBeVisible();
+});
+
+test("unapproved privacy and a directory outage have different public recovery states", async ({ page }) => {
+	await page.goto("/check-in/44444444-4444-4444-8444-444444444444");
+	await expect(page.getByRole("heading", { name: "Check-in is not configured" })).toBeVisible();
+	await page.goto("/check-in/55555555-5555-4555-8555-555555555555");
+	await expect(page.getByRole("heading", { name: "Check-in temporarily unavailable" })).toBeVisible();
+});
+
+test("host preview distinguishes expired and invalid links", async ({ page }) => {
+	await page.goto(`/host-decision#token=${"b".repeat(64)}`);
+	await expect(page.getByText("This decision link has expired. Ask reception for help.")).toBeVisible();
+	await page.goto(`/host-decision#token=${"c".repeat(64)}`);
+	await expect(page.getByText("This decision link is invalid. Ask reception to send a current link.")).toBeVisible();
+});
+
 test("invitation token moves from the fragment to an HttpOnly cookie", async ({ page, context }) => {
 	const token = "b".repeat(64);
 	await page.goto(`/invite#token=${token}`);
