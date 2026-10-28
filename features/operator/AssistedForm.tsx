@@ -3,11 +3,11 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRef, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
-import { createClient } from "@/lib/supabase/browser";
+import { invokeFunction } from "@/lib/http/invoke-function";
 import { publicVisitSchema, visitTypes, type PublicVisitValues } from "@/features/public-check-in/schema";
 import type { Department, Staff } from "./types";
 import { useOnlineStatus } from "@/lib/hooks/use-online-status";
-import { functionError } from "@/lib/http/request-error";
+import { RequestError } from "@/lib/http/request-error";
 import styles from "./operator.module.css";
 
 export function AssistedForm({
@@ -47,14 +47,46 @@ export function AssistedForm({
 		control: form.control,
 		name: "department_id",
 	});
+	function fieldProps(name: keyof PublicVisitValues, helpId?: string) {
+		const invalid = Boolean(form.formState.errors[name]);
+		return {
+			id: `assisted-${name}`,
+			"aria-invalid": invalid ? (true as const) : undefined,
+			"aria-describedby":
+				[helpId, invalid ? `assisted-${name}-error` : undefined].filter(Boolean).join(" ") || undefined,
+		};
+	}
+	function fieldError(name: keyof PublicVisitValues) {
+		const issue = form.formState.errors[name]?.message;
+		return issue ? (
+			<small id={`assisted-${name}-error`} role="alert">
+				{issue}
+			</small>
+		) : null;
+	}
 
 	async function submit(values: PublicVisitValues) {
+		if (values.department_id && !departments.some((item) => item.id === values.department_id && item.is_active)) {
+			form.setError("department_id", { message: "Choose an available department." });
+			form.setFocus("department_id");
+			return;
+		}
+		if (
+			values.staff_id &&
+			!staff.some(
+				(item) => item.id === values.staff_id && item.department_id === values.department_id && item.is_active,
+			)
+		) {
+			form.setError("staff_id", { message: "Choose an available host in the selected department." });
+			form.setFocus("staff_id");
+			return;
+		}
 		if (!window.confirm(`Create this visit at ${branchName}?`)) return;
 		const key = idempotencyKey ?? crypto.randomUUID();
 		setIdempotencyKey(key);
 		setError("");
-		const { error: failure, response } = await createClient().functions.invoke("create-assisted-visit", {
-			body: {
+		try {
+			await invokeFunction("create-assisted-visit", {
 				location_id: branchId,
 				idempotency_key: key,
 				visitor_full_name: values.visitor_full_name,
@@ -66,10 +98,15 @@ export function AssistedForm({
 				purpose: values.purpose,
 				department_id: values.department_id || null,
 				staff_id: values.staff_id || null,
-			},
-		});
-		if (failure) {
-			setError((await functionError(failure, response)).message);
+			});
+		} catch (cause) {
+			if (cause instanceof RequestError && cause.status !== null && cause.status < 500 && cause.status !== 409)
+				setIdempotencyKey(null);
+			setError(
+				cause instanceof RequestError
+					? cause.message
+					: "The visit outcome is unclear. Check the queue before retrying.",
+			);
 			return;
 		}
 		setIdempotencyKey(null);
@@ -93,29 +130,36 @@ export function AssistedForm({
 				Branch: <strong>{branchName}</strong>
 			</p>
 			<label>
-				Full name <input {...form.register("visitor_full_name")} />
+				Full name <input {...fieldProps("visitor_full_name")} {...form.register("visitor_full_name")} />
 			</label>
-			{form.formState.errors.visitor_full_name && (
-				<small role="alert">{form.formState.errors.visitor_full_name.message}</small>
-			)}
+			{fieldError("visitor_full_name")}
 			<label>
-				Preferred name <input {...form.register("visitor_preferred_name")} />
+				Preferred name{" "}
+				<input {...fieldProps("visitor_preferred_name")} {...form.register("visitor_preferred_name")} />
 			</label>
+			{fieldError("visitor_preferred_name")}
 			<label>
-				Email (optional) <input type="email" {...form.register("visitor_email")} />
+				Email (optional){" "}
+				<input type="email" {...fieldProps("visitor_email")} {...form.register("visitor_email")} />
 			</label>
+			{fieldError("visitor_email")}
 			<label>
-				Phone number <input type="tel" placeholder="+234…" {...form.register("phone_number")} />
+				Phone number{" "}
+				<input
+					type="tel"
+					placeholder="+234…"
+					{...fieldProps("phone_number")}
+					{...form.register("phone_number")}
+				/>
 			</label>
-			{form.formState.errors.phone_number && (
-				<small role="alert">{form.formState.errors.phone_number.message}</small>
-			)}
+			{fieldError("phone_number")}
 			<label>
-				Organization (optional) <input {...form.register("organization")} />
+				Organization (optional) <input {...fieldProps("organization")} {...form.register("organization")} />
 			</label>
+			{fieldError("organization")}
 			<label>
 				Visit type{" "}
-				<select {...form.register("visit_type")}>
+				<select {...fieldProps("visit_type")} {...form.register("visit_type")}>
 					{visitTypes.map((type) => (
 						<option key={type} value={type}>
 							{type}
@@ -123,14 +167,20 @@ export function AssistedForm({
 					))}
 				</select>
 			</label>
+			{fieldError("visit_type")}
 			<label>
-				Purpose <textarea rows={2} {...form.register("purpose")} />
+				Purpose <textarea rows={2} {...fieldProps("purpose")} {...form.register("purpose")} />
 			</label>
+			{fieldError("purpose")}
 			<label>
 				Department (optional){" "}
 				<select
+					{...fieldProps("department_id")}
 					{...form.register("department_id", {
-						onChange: () => form.setValue("staff_id", ""),
+						onChange: () => {
+							form.setValue("staff_id", "");
+							form.clearErrors(["department_id", "staff_id"]);
+						},
 					})}
 				>
 					<option value="">No department</option>
@@ -141,12 +191,17 @@ export function AssistedForm({
 					))}
 				</select>
 			</label>
+			{fieldError("department_id")}
 			<label>
 				Host (optional){" "}
-				<select disabled={!departmentId} {...form.register("staff_id")}>
+				<select
+					disabled={!departmentId}
+					{...fieldProps("staff_id", "assisted-host-help")}
+					{...form.register("staff_id")}
+				>
 					<option value="">No host</option>
 					{staff
-						.filter((item) => item.department_id === departmentId)
+						.filter((item) => item.department_id === departmentId && item.is_active)
 						.map((item) => (
 							<option key={item.id} value={item.id}>
 								{item.preferred_name || item.full_name}
@@ -154,6 +209,8 @@ export function AssistedForm({
 						))}
 				</select>
 			</label>
+			<small id="assisted-host-help">Choose a department before selecting a host.</small>
+			{fieldError("staff_id")}
 			{error && (
 				<p role="alert" className={styles.error}>
 					{error}

@@ -7,6 +7,7 @@ import type { Visit } from "./types";
 import { clearScheduledVisitRefresh, refreshVisitQueries, scheduleVisitRefresh } from "./refresh-queue";
 import { reportClientFailure } from "@/lib/observability/client";
 import { postgrestError } from "@/lib/http/request-error";
+import { READ_TIMEOUT_MS, withRequestTimeout } from "@/lib/http/timeout";
 
 export const ACTIVE_STATUSES = [
 	"pending_reception_review",
@@ -24,16 +25,23 @@ function useVisitGroup(branchId: string | null, status: QueueStatus, search: str
 		queryKey: ["visit-queue", branchId, status, search],
 		enabled: Boolean(branchId),
 		initialPageParam: null as Cursor | null,
-		queryFn: async ({ pageParam }) => {
+		queryFn: async ({ pageParam, signal }) => {
 			if (!branchId) return { items: [] as Visit[], next: null as Cursor | null };
-			const { data, error } = await createClient().rpc("tgm_list_visit_queue", {
-				p_location_id: branchId,
-				p_status: status === "history" ? undefined : status,
-				p_search: search || undefined,
-				p_after_arrived_at: pageParam?.arrived_at,
-				p_after_id: pageParam?.id,
-				p_page_size: PAGE_SIZE + 1,
-			});
+			const { data, error } = await withRequestTimeout(
+				async (requestSignal) =>
+					await createClient()
+						.rpc("tgm_list_visit_queue", {
+							p_location_id: branchId,
+							p_status: status === "history" ? undefined : status,
+							p_search: search || undefined,
+							p_after_arrived_at: pageParam?.arrived_at,
+							p_after_id: pageParam?.id,
+							p_page_size: PAGE_SIZE + 1,
+						})
+						.abortSignal(requestSignal),
+				READ_TIMEOUT_MS,
+				signal,
+			);
 			if (error) throw postgrestError(error);
 			const rows = (data ?? []) as Visit[];
 			const items = rows.slice(0, PAGE_SIZE);
@@ -64,12 +72,19 @@ export function useVisits(branchId: string | null, search: string) {
 	const counts = useQuery({
 		queryKey: ["visit-queue-counts", branchId, search],
 		enabled: Boolean(branchId),
-		queryFn: async () => {
+		queryFn: async ({ signal }) => {
 			if (!branchId) return null;
-			const { data, error } = await createClient().rpc("tgm_visit_queue_counts", {
-				p_location_id: branchId,
-				p_search: search || undefined,
-			});
+			const { data, error } = await withRequestTimeout(
+				async (requestSignal) =>
+					await createClient()
+						.rpc("tgm_visit_queue_counts", {
+							p_location_id: branchId,
+							p_search: search || undefined,
+						})
+						.abortSignal(requestSignal),
+				READ_TIMEOUT_MS,
+				signal,
+			);
 			if (error) throw postgrestError(error);
 			return data as Record<QueueStatus, number>;
 		},

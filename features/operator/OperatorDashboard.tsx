@@ -12,6 +12,8 @@ import { useVisits } from "./useVisits";
 import { useAccessWatch } from "./useAccessWatch";
 import type { Branch, Department, Staff } from "./types";
 import styles from "./operator.module.css";
+import { postgrestError } from "@/lib/http/request-error";
+import { READ_TIMEOUT_MS, withRequestTimeout } from "@/lib/http/timeout";
 
 type Props = {
 	organization: { id: string; name: string };
@@ -54,33 +56,41 @@ function DashboardContent({
 		initialData: { branches: initialBranches, departments: initialDepartments, staff: initialStaff },
 		staleTime: 0,
 		refetchOnMount: "always",
-		queryFn: async () => {
+		queryFn: async ({ signal }) => {
 			const supabase = createClient();
-			const [branchResult, departmentResult, staffResult] = await Promise.all([
-				supabase
-					.from("locations")
-					.select(
-						"id,name,timezone,public_slug,is_active,auto_close_enabled,auto_close_local_time,address,reception_overdue_minutes,host_overdue_minutes,admission_overdue_minutes",
-					)
-					.eq("organization_id", organization.id)
-					.eq("is_active", true)
-					.order("name"),
-				supabase
-					.from("departments")
-					.select("id,name,is_active")
-					.eq("organization_id", organization.id)
-					.eq("is_active", true)
-					.order("name"),
-				supabase
-					.from("staff")
-					.select("id,full_name,preferred_name,department_id,location_id,email,is_active")
-					.eq("organization_id", organization.id)
-					.eq("is_active", true)
-					.order("full_name"),
-			]);
-			if (branchResult.error) throw branchResult.error;
-			if (departmentResult.error) throw departmentResult.error;
-			if (staffResult.error) throw staffResult.error;
+			const [branchResult, departmentResult, staffResult] = await withRequestTimeout(
+				(requestSignal) =>
+					Promise.all([
+						supabase
+							.from("locations")
+							.select(
+								"id,name,timezone,public_slug,is_active,auto_close_enabled,auto_close_local_time,address,reception_overdue_minutes,host_overdue_minutes,admission_overdue_minutes",
+							)
+							.eq("organization_id", organization.id)
+							.eq("is_active", true)
+							.order("name")
+							.abortSignal(requestSignal),
+						supabase
+							.from("departments")
+							.select("id,name,is_active")
+							.eq("organization_id", organization.id)
+							.eq("is_active", true)
+							.order("name")
+							.abortSignal(requestSignal),
+						supabase
+							.from("staff")
+							.select("id,full_name,preferred_name,department_id,location_id,email,is_active")
+							.eq("organization_id", organization.id)
+							.eq("is_active", true)
+							.order("full_name")
+							.abortSignal(requestSignal),
+					]),
+				READ_TIMEOUT_MS,
+				signal,
+			);
+			if (branchResult.error) throw postgrestError(branchResult.error);
+			if (departmentResult.error) throw postgrestError(departmentResult.error);
+			if (staffResult.error) throw postgrestError(staffResult.error);
 			return {
 				branches: branchResult.data ?? [],
 				departments: departmentResult.data ?? [],
@@ -100,8 +110,9 @@ function DashboardContent({
 	const visits = useVisits(branchId || null, search);
 
 	async function signOut() {
-		await createClient().auth.signOut({ scope: "local" });
-		router.replace("/login");
+		// This action ends only this device's session. Auth JS clears it on a remote error.
+		const { error } = await createClient().auth.signOut({ scope: "local" });
+		router.replace(error ? "/login?error=local-signout" : "/login");
 		router.refresh();
 	}
 

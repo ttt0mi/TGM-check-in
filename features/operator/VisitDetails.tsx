@@ -9,7 +9,9 @@ import { publicVisitSchema, visitTypes, type PublicVisitValues } from "@/feature
 import type { Department, Staff, Visit } from "./types";
 import styles from "./operator.module.css";
 import { visitEventLabel, visitTypeLabel } from "@/features/shared/visit-labels";
-import { functionError, postgrestError } from "@/lib/http/request-error";
+import { postgrestError, RequestError } from "@/lib/http/request-error";
+import { invokeFunction } from "@/lib/http/invoke-function";
+import { READ_TIMEOUT_MS, withRequestTimeout } from "@/lib/http/timeout";
 
 export function VisitDetails({
 	visit,
@@ -25,12 +27,18 @@ export function VisitDetails({
 	const [editing, setEditing] = useState(false);
 	const events = useQuery({
 		queryKey: ["visit-events", visit.id],
-		queryFn: async () => {
-			const { data, error } = await createClient()
-				.from("visit_events")
-				.select("id,event_type,event_source,actor_role,occurred_at")
-				.eq("visit_id", visit.id)
-				.order("occurred_at", { ascending: true });
+		queryFn: async ({ signal }) => {
+			const { data, error } = await withRequestTimeout(
+				async (requestSignal) =>
+					await createClient()
+						.from("visit_events")
+						.select("id,event_type,event_source,actor_role,occurred_at")
+						.eq("visit_id", visit.id)
+						.order("occurred_at", { ascending: true })
+						.abortSignal(requestSignal),
+				READ_TIMEOUT_MS,
+				signal,
+			);
 			if (error) throw postgrestError(error);
 			return data;
 		},
@@ -168,18 +176,26 @@ function VisitEditor({
 			onSaved();
 			return;
 		}
-		const { error: failure, response } = await createClient().functions.invoke("reception-visit-action", {
-			body: { visit_id: visit.id, action: "edit", patch },
-		});
-		if (failure) {
-			setError((await functionError(failure, response)).message);
+		try {
+			await invokeFunction("reception-visit-action", { visit_id: visit.id, action: "edit", patch });
+		} catch (cause) {
+			setError(
+				cause instanceof RequestError
+					? cause.message
+					: "Edit outcome is unclear. Refresh the visit before retrying.",
+			);
 			return;
 		}
-		await Promise.all([
-			queryClient.invalidateQueries({ queryKey: ["visit-queue", visit.location_id] }),
-			queryClient.invalidateQueries({ queryKey: ["visit-queue-counts", visit.location_id] }),
-			queryClient.invalidateQueries({ queryKey: ["visit-events", visit.id] }),
-		]);
+		try {
+			await Promise.all([
+				queryClient.invalidateQueries({ queryKey: ["visit-queue", visit.location_id] }),
+				queryClient.invalidateQueries({ queryKey: ["visit-queue-counts", visit.location_id] }),
+				queryClient.invalidateQueries({ queryKey: ["visit-events", visit.id] }),
+			]);
+		} catch {
+			setError("Visit updated, but records could not be refreshed. Refresh the queue.");
+			return;
+		}
 		onSaved();
 	}
 	return (

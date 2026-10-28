@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/browser";
 import { functionError, postgrestError, RequestError } from "@/lib/http/request-error";
+import { EMAIL_TIMEOUT_MS, MUTATION_TIMEOUT_MS, READ_TIMEOUT_MS, withRequestTimeout } from "@/lib/http/timeout";
 import type { Visit } from "./types";
 import styles from "./operator.module.css";
 import { scheduleVisitRefresh } from "./refresh-queue";
@@ -37,14 +38,20 @@ export function VisitActions({
 	const delivery = useQuery({
 		queryKey: ["host-delivery", visit.id],
 		enabled: visit.status === "pending_host_acknowledgement" && showDelivery,
-		queryFn: async () => {
-			const { data, error } = await createClient()
-				.from("host_notification_attempts")
-				.select("status,attempted_at")
-				.eq("visit_id", visit.id)
-				.order("attempted_at", { ascending: false })
-				.limit(1)
-				.maybeSingle();
+		queryFn: async ({ signal }) => {
+			const { data, error } = await withRequestTimeout(
+				async (requestSignal) =>
+					await createClient()
+						.from("host_notification_attempts")
+						.select("status,attempted_at")
+						.eq("visit_id", visit.id)
+						.order("attempted_at", { ascending: false })
+						.limit(1)
+						.abortSignal(requestSignal)
+						.maybeSingle(),
+				READ_TIMEOUT_MS,
+				signal,
+			);
 			if (error) throw postgrestError(error);
 			return data;
 		},
@@ -103,23 +110,35 @@ export function VisitActions({
 		try {
 			const supabase = createClient();
 			const endpoint = action === "notify" ? "send-host-email" : "reception-visit-action";
-			const timeout = AbortSignal.timeout(action === "notify" ? 30000 : 20000);
-			const { error, response } = await supabase.functions.invoke(endpoint, {
-				body:
-					action === "notify"
-						? { visit_id: visit.id }
-						: { visit_id: visit.id, action, ...(patch ? { patch } : {}) },
-				signal: timeout,
-			});
-			if (timeout.aborted) throw new RequestError("unavailable", null, "Request timed out.");
-			if (error) throw await functionError(error, response);
+			await withRequestTimeout(
+				async (signal) => {
+					const { error, response } = await supabase.functions.invoke(endpoint, {
+						body:
+							action === "notify"
+								? { visit_id: visit.id }
+								: { visit_id: visit.id, action, ...(patch ? { patch } : {}) },
+						signal,
+					});
+					if (error) throw await functionError(error, response);
+				},
+				action === "notify" ? EMAIL_TIMEOUT_MS : MUTATION_TIMEOUT_MS,
+			);
 			if (action === "review") {
-				const emailTimeout = AbortSignal.timeout(30000);
-				const sent = await supabase.functions.invoke("send-host-email", {
-					body: { visit_id: visit.id },
-					signal: emailTimeout,
-				});
-				if (emailTimeout.aborted || sent.error) {
+				let emailUnclear = false;
+				try {
+					const sent = await withRequestTimeout(
+						(signal) =>
+							supabase.functions.invoke("send-host-email", {
+								body: { visit_id: visit.id },
+								signal,
+							}),
+						EMAIL_TIMEOUT_MS,
+					);
+					emailUnclear = Boolean(sent.error);
+				} catch {
+					emailUnclear = true;
+				}
+				if (emailUnclear) {
 					setMessage("Review saved. Host email outcome is unclear; check delivery history before retrying.");
 					setFailed(true);
 				} else setMessage("Host notified.");
@@ -136,7 +155,7 @@ export function VisitActions({
 				action === "notify"
 					? "Email outcome is unclear. Check delivery history before retrying."
 					: cause instanceof RequestError && cause.status !== null
-						? `${cause.message}${cause.correlationId ? ` Reference: ${cause.correlationId}.` : ""}`
+						? cause.message
 						: "Action could not be confirmed. Refresh the queue before retrying.",
 			);
 			setFailed(true);

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
+import { READ_TIMEOUT_MS, withRequestTimeout } from "@/lib/http/timeout";
 
 export function useAccessWatch(input: { role: "admin" | "receptionist"; organizationId: string; branchId: string }) {
 	const router = useRouter();
@@ -40,11 +41,16 @@ export function useAccessWatch(input: { role: "admin" | "receptionist"; organiza
 				} = await supabase.auth.getUser();
 				if (userError) return fail();
 				if (!user) return await revoke("/login");
-				const { data: profile, error: profileError } = await supabase
-					.from("operator_profiles")
-					.select("role,is_active,organization_id")
-					.eq("user_id", user.id)
-					.maybeSingle();
+				const { data: profile, error: profileError } = await withRequestTimeout(
+					async (signal) =>
+						await supabase
+							.from("operator_profiles")
+							.select("role,is_active,organization_id")
+							.eq("user_id", user.id)
+							.abortSignal(signal)
+							.maybeSingle(),
+					READ_TIMEOUT_MS,
+				);
 				if (profileError) return fail();
 				if (
 					!profile?.is_active ||
@@ -53,19 +59,29 @@ export function useAccessWatch(input: { role: "admin" | "receptionist"; organiza
 				)
 					return await revoke("/start");
 				if (input.role === "receptionist") {
-					const { data: assignment, error: assignmentError } = await supabase
-						.from("receptionist_location_assignments")
-						.select("location_id")
-						.eq("user_id", user.id)
-						.maybeSingle();
+					const { data: assignment, error: assignmentError } = await withRequestTimeout(
+						async (signal) =>
+							await supabase
+								.from("receptionist_location_assignments")
+								.select("location_id")
+								.eq("user_id", user.id)
+								.abortSignal(signal)
+								.maybeSingle(),
+						READ_TIMEOUT_MS,
+					);
 					if (assignmentError) return fail();
 					if (assignment?.location_id !== input.branchId) return await revoke("/start");
 				}
-				const { data: organization, error: organizationError } = await supabase
-					.from("organizations")
-					.select("is_active")
-					.eq("id", input.organizationId)
-					.maybeSingle();
+				const { data: organization, error: organizationError } = await withRequestTimeout(
+					async (signal) =>
+						await supabase
+							.from("organizations")
+							.select("is_active")
+							.eq("id", input.organizationId)
+							.abortSignal(signal)
+							.maybeSingle(),
+					READ_TIMEOUT_MS,
+				);
 				if (organizationError) return fail();
 				if (!organization?.is_active) return await revoke("/suspended");
 				await supabase.realtime.setAuth();
