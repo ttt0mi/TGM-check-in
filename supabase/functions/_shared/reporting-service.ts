@@ -44,7 +44,8 @@ export async function reportRequest(req: Request, ctx: SupabaseContext<Database>
 	if (locationId) {
 		const { data, error } = await operator.service.from("locations")
 			.select("id").eq("organization_id", operator.organizationId)
-			.eq("id", locationId).maybeSingle();
+			.eq("id", locationId)
+            .maybeSingle();
 		if (error || !data) throw new HttpError(403, "Branch access denied");
 	}
 	const scope: Scope = {
